@@ -720,16 +720,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
 
           {/* Right - Actions and User */}
           <div className="flex items-center gap-3">
-            <Link href="/reports">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 hover:scale-110 transition-all duration-300"
-                title="Reports & Analytics"
-              >
-                <BarChart3 className="h-5 w-5" />
-              </Button>
-            </Link>
             <Button
               variant="ghost"
               size="sm"
