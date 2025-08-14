@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://unpkg.com/@rive-app/canvas@2.7.0"></script>
+</head>
+<body>
+    <canvas id="rive-canvas" width="200" height="200"></canvas>
+    <script>
+        const r = new rive.Rive({
+            src: 'https://www.i-madtechnology.com/mapos.riv',
+            canvas: document.getElementById('rive-canvas'),
+            autoplay: true,
+            onLoad: () => {
+                r.resizeDrawingSurfaceToCanvas();
+            },
+        });
+    </script>
+</body>
+</html>
