@@ -666,22 +666,9 @@ export const useInventoryStore = create<InventoryState>()(
 
       loadCategories: async () => {
         try {
-          // Call external API directly
-          const inventoryConfig = {
-            baseUrl: process.env.NEXT_PUBLIC_INVENTORY_API_URL || '',
-            apiKey: process.env.NEXT_PUBLIC_INVENTORY_API_KEY || ''
-          }
-          
-          const url = new URL('/api/external/categories', inventoryConfig.baseUrl)
-          const response = await fetch(url.toString(), {
-            headers: {
-              'x-api-key': inventoryConfig.apiKey,
-              'Content-Type': 'application/json'
-            }
-          })
-          
+          const response = await fetch('/api/categories')
           if (!response.ok) {
-            console.warn('Failed to fetch categories from external API, using mock data')
+            console.warn('Failed to fetch categories, using mock data')
             return
           }
           
