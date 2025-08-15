@@ -1395,9 +1395,16 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
         {/* Cart Sidebar */}
         <div className="w-96 border-l bg-white/80 backdrop-blur-xl border-purple-100 p-6 flex flex-col max-h-full">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
-              Cart
-            </h2>
+            <div>
+              <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                Cart
+              </h2>
+              {cart.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Tip: Shift+Click ❌ to void with audit trail
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -1490,22 +1497,20 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                           <DollarSign className="h-3 w-3" />
                         </SoundButton>
                         <SoundButton
-                          onClick={() => initiateVoid(item.id)}
-                          variant="ghost"
-                          size="sm"
-                          soundType="click"
-                          className="h-6 w-6 p-0 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded-lg hover:scale-110 transition-all duration-300"
-                          title="Void Item (Manager Approval Required)"
-                        >
-                          <AlertTriangle className="h-3 w-3" />
-                        </SoundButton>
-                        <SoundButton
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={(e) => {
+                            // Shift+click or Alt+click for void with audit trail
+                            if (e.shiftKey || e.altKey) {
+                              initiateVoid(item.id)
+                            } else {
+                              // Simple remove
+                              removeFromCart(item.id)
+                            }
+                          }}
                           variant="ghost"
                           size="sm"
                           soundType="click"
                           className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg hover:scale-110 transition-all duration-300"
-                          title="Remove Item"
+                          title="Remove Item (Shift+Click for audit trail)"
                         >
                           <X className="h-3 w-3" />
                         </SoundButton>
