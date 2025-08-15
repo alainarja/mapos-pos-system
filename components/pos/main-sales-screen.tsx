@@ -146,7 +146,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   } = useSavedCartsStore()
   
   const {
-    products: mockProducts,
+    products,
     categories,
     selectedCategory,
     searchTerm,
@@ -934,7 +934,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                         </motion.div>
                         <h3 className="text-lg font-semibold mb-1 text-slate-800 dark:text-slate-200">{category.name}</h3>
                         <p className="text-purple-600 dark:text-purple-400 text-sm font-medium">
-                          {mockProducts.filter(p => p.category === category.name).length} items
+                          {products.filter(p => p.category === category.name).length} items
                         </p>
                       </CardContent>
                     </Card>

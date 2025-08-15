@@ -77,6 +77,19 @@ class ExternalAPIService {
     )
   }
 
+  // Categories methods
+  async getCategories(params?: { search?: string; includeHierarchy?: boolean; parentOnly?: boolean }) {
+    return this.makeRequest(
+      this.inventoryConfig,
+      '/api/external/categories',
+      {
+        search: params?.search || '',
+        includeHierarchy: params?.includeHierarchy ? 'true' : 'false',
+        parentOnly: params?.parentOnly ? 'true' : 'false'
+      }
+    )
+  }
+
   // Customer methods  
   async getCustomers(params?: PaginationParams) {
     return this.makeRequest(

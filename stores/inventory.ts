@@ -2,6 +2,26 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Product, Category, InventoryAlert, ProductFilter, SortOption, PriceRange, FilterChip } from '@/types'
 
+// Helper function to assign appropriate icons to categories
+function getCategoryIcon(categoryName: string): string {
+  const name = categoryName.toLowerCase()
+  
+  if (name.includes('coffee')) return '☕'
+  if (name.includes('tea')) return '🍵'
+  if (name.includes('snack')) return '🍿'
+  if (name.includes('bakery') || name.includes('bread') || name.includes('pastry') || name.includes('croissant')) return '🥐'
+  if (name.includes('beverage') || name.includes('drink') || name.includes('juice')) return '🥤'
+  if (name.includes('food') || name.includes('meal') || name.includes('lunch') || name.includes('dinner')) return '🍽️'
+  if (name.includes('special') || name.includes('premium') || name.includes('limited')) return '⭐'
+  if (name.includes('sales')) return '🛒'
+  if (name.includes('marble') || name.includes('stone')) return '🪨'
+  if (name.includes('material') || name.includes('raw')) return '📦'
+  if (name.includes('tool') || name.includes('equipment')) return '🔧'
+  
+  // Default icon
+  return '📁'
+}
+
 interface SearchSuggestion {
   id: string
   type: 'product' | 'category' | 'brand' | 'sku' | 'recent' | 'trending'
@@ -26,6 +46,7 @@ interface SearchHistory {
 interface InventoryState {
   products: Product[]
   categories: Category[]
+  categoryMap: Record<string, string> // Maps category UUID to category name
   alerts: InventoryAlert[]
   selectedCategory: string
   searchTerm: string
@@ -68,6 +89,7 @@ interface InventoryState {
   setAutoRefreshEnabled: (enabled: boolean) => void
   setAutoRefreshInterval: (minutes: number) => void
   loadInitialData: () => Promise<void>
+  loadCategories: () => Promise<void>
   
   // Enhanced Search and Filter Actions
   setFilters: (filters: Partial<ProductFilter>) => void
@@ -324,6 +346,7 @@ export const useInventoryStore = create<InventoryState>()(
     (set, get) => ({
       products: mockProducts,
       categories: mockCategories,
+      categoryMap: {},
       alerts: [],
       selectedCategory: "All",
       searchTerm: "",
@@ -543,12 +566,13 @@ export const useInventoryStore = create<InventoryState>()(
           const apiData = await response.json()
           
           // Transform API data to Product format
+          const { categoryMap } = get()
           const products = apiData.data.map((item: any) => ({
             id: item.id,
             name: item.name,
             price: item.selling_price || item.price || 0,
             cost: item.unit_price || 0,
-            category: item.category || 'Uncategorized',
+            category: categoryMap[item.category] || 'Uncategorized',
             image: item.imageUrl || item.image_url,
             stock: item.quantity || 0,
             barcode: item.sku,
@@ -598,6 +622,9 @@ export const useInventoryStore = create<InventoryState>()(
       
       loadInitialData: async () => {
         try {
+          // Load categories first
+          await get().loadCategories()
+          
           const response = await fetch('/api/inventory')
           if (!response.ok) {
             console.warn('Failed to fetch initial inventory data, using mock data')
@@ -607,12 +634,13 @@ export const useInventoryStore = create<InventoryState>()(
           const apiData = await response.json()
           
           // Transform API data to Product format
+          const { categoryMap } = get()
           const products = apiData.data.map((item: any) => ({
             id: item.id,
             name: item.name,
             price: item.selling_price || item.price || 0,
             cost: item.unit_price || 0,
-            category: item.category || 'Uncategorized',
+            category: categoryMap[item.category] || 'Uncategorized',
             image: item.imageUrl || item.image_url,
             stock: item.quantity || 0,
             barcode: item.sku,
@@ -633,6 +661,52 @@ export const useInventoryStore = create<InventoryState>()(
           get().generateAlerts()
         } catch (error) {
           console.warn('Failed to load initial data:', error)
+        }
+      },
+
+      loadCategories: async () => {
+        try {
+          // Call external API directly
+          const inventoryConfig = {
+            baseUrl: process.env.NEXT_PUBLIC_INVENTORY_API_URL || '',
+            apiKey: process.env.NEXT_PUBLIC_INVENTORY_API_KEY || ''
+          }
+          
+          const url = new URL('/api/external/categories', inventoryConfig.baseUrl)
+          const response = await fetch(url.toString(), {
+            headers: {
+              'x-api-key': inventoryConfig.apiKey,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (!response.ok) {
+            console.warn('Failed to fetch categories from external API, using mock data')
+            return
+          }
+          
+          const apiData = await response.json()
+          
+          // Transform API data to Category format
+          const categories = apiData.data.map((item: any, index: number) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description || `${item.name} products`,
+            icon: getCategoryIcon(item.name),
+            parentId: item.parent_id,
+            isActive: true,
+            order: index + 1
+          }))
+          
+          // Build category UUID to name mapping
+          const categoryMap: Record<string, string> = {}
+          categories.forEach(category => {
+            categoryMap[category.id] = category.name
+          })
+          
+          set({ categories, categoryMap })
+        } catch (error) {
+          console.warn('Failed to load categories:', error)
         }
       },
 
@@ -1190,6 +1264,7 @@ export const useInventoryStore = create<InventoryState>()(
       partialize: (state) => ({
         products: state.products,
         categories: state.categories,
+        categoryMap: state.categoryMap,
         selectedCategory: state.selectedCategory,
         searchTerm: state.searchTerm,
         autoRefreshEnabled: state.autoRefreshEnabled,

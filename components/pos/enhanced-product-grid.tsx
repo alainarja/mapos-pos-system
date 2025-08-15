@@ -89,13 +89,29 @@ export function EnhancedProductGrid({
         <h3 className={`text-lg font-semibold mb-2 ${
           isDarkMode ? "text-slate-300" : "text-gray-700"
         }`}>
-          No products found
+          No products available
         </h3>
-        <p className={`text-sm ${
+        <p className={`text-sm mb-4 ${
           isDarkMode ? "text-slate-500" : "text-gray-500"
         }`}>
-          Try adjusting your search or filter criteria
+          Get started by adding products to the inventory system
         </p>
+        <div className={`text-xs px-4 py-2 rounded-lg ${
+          isDarkMode ? "bg-slate-800 text-slate-400" : "bg-gray-100 text-gray-600"
+        }`}>
+          Visit{' '}
+          <a 
+            href="https://inventorymarble.vercel.app" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={`font-medium underline hover:no-underline ${
+              isDarkMode ? "text-purple-400" : "text-purple-600"
+            }`}
+          >
+            Inventory Management System
+          </a>
+          {' '}to add items under the "Sales" category
+        </div>
       </div>
     )
   }
