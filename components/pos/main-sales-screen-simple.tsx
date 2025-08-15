@@ -8,6 +8,7 @@ import { useSound } from "@/hooks/use-sound"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
 import {
   Search,
   Plus,
@@ -112,7 +113,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [showCashManagement, setShowCashManagement] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [showCouponManagement, setShowCouponManagement] = useState(false)
   const [showReturnsExchange, setShowReturnsExchange] = useState(false)
   const [barcodeInput, setBarcodeInput] = useState("")
   const [isScanning, setIsScanning] = useState(false)
@@ -155,6 +155,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [showQuickKeysConfig, setShowQuickKeysConfig] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
   const [searchConfigTerm, setSearchConfigTerm] = useState('')
+  const [expenses, setExpenses] = useState<Array<{id: string, description: string, amount: number, category: string, timestamp: Date}>>([])
+  const [showAddExpense, setShowAddExpense] = useState(false)
+  const [expenseDescription, setExpenseDescription] = useState('')
+  const [expenseAmount, setExpenseAmount] = useState('')
+  const [expenseCategory, setExpenseCategory] = useState('general')
 
   const addToCart = (product: Product) => {
     addItem(product)
@@ -166,6 +171,39 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
 
   const removeFromCart = (id: string) => {
     removeItem(id)
+  }
+
+  const handleAddExpense = () => {
+    if (!expenseDescription.trim() || !expenseAmount || parseFloat(expenseAmount) <= 0) {
+      alert('Please enter valid expense details')
+      return
+    }
+
+    const newExpense = {
+      id: Date.now().toString(),
+      description: expenseDescription.trim(),
+      amount: parseFloat(expenseAmount),
+      category: expenseCategory,
+      timestamp: new Date()
+    }
+
+    setExpenses(prev => [newExpense, ...prev])
+    setExpenseDescription('')
+    setExpenseAmount('')
+    setExpenseCategory('general')
+    setShowAddExpense(false)
+    playSuccess()
+
+    // Show notification
+    addNotification({
+      id: Date.now().toString(),
+      type: 'success',
+      title: 'Expense Added',
+      message: `${newExpense.description}: $${newExpense.amount.toFixed(2)}`,
+      timestamp: new Date(),
+      isRead: false,
+      duration: 3000
+    })
   }
 
   // Fuzzy search algorithm
@@ -921,17 +959,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
               <span>Returns & Exchanges</span>
             </Button>
             
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 h-12 px-4 hover:bg-pink-50 hover:text-pink-700"
-              onClick={() => {
-                setShowCouponManagement(true)
-                setIsSidebarOpen(false)
-              }}
-            >
-              <Tag className="h-5 w-5" />
-              <span>Coupon Management</span>
-            </Button>
             
             <Button
               variant="ghost"
@@ -1790,9 +1817,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       {/* Cash Management Dialog */}
       {showCashManagement && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Cash Management</h2>
+              <h2 className="text-xl font-bold text-gray-800">Cash Management & Expenses</h2>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1802,15 +1829,158 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <div className="space-y-4">
-              <div className="bg-emerald-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Current Drawer</p>
-                <p className="text-2xl font-bold text-emerald-600">$1,234.56</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cash Drawer Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-gray-800">Cash Drawer</h3>
+                <div className="bg-emerald-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Current Drawer</p>
+                  <p className="text-2xl font-bold text-emerald-600">$1,234.56</p>
+                </div>
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Count Drawer</Button>
+                <Button className="w-full" variant="outline">Print Cash Report</Button>
               </div>
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Count Drawer</Button>
-              <Button className="w-full" variant="outline">Add Cash</Button>
-              <Button className="w-full" variant="outline">Remove Cash</Button>
-              <Button className="w-full" variant="outline">Print Cash Report</Button>
+              
+              {/* Expenses Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-800">Expenses</h3>
+                  <Button 
+                    onClick={() => setShowAddExpense(true)}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Expense
+                  </Button>
+                </div>
+                
+                {/* Today's Expenses Summary */}
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Today's Expenses</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    ${expenses
+                      .filter(expense => 
+                        new Date(expense.timestamp).toDateString() === new Date().toDateString()
+                      )
+                      .reduce((sum, expense) => sum + expense.amount, 0)
+                      .toFixed(2)
+                    }
+                  </p>
+                </div>
+                
+                {/* Recent Expenses */}
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {expenses.slice(0, 5).map((expense) => (
+                    <div key={expense.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium text-sm">{expense.description}</p>
+                        <p className="text-xs text-gray-500">{expense.category}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-red-600">${expense.amount.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">
+                          {expense.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {expenses.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No expenses recorded today</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Expense Dialog */}
+      {showAddExpense && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800">Add Expense</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowAddExpense(false)
+                  setExpenseDescription('')
+                  setExpenseAmount('')
+                  setExpenseCategory('general')
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="expense-description">Description</Label>
+                <Input
+                  id="expense-description"
+                  placeholder="Office supplies, utilities, etc."
+                  value={expenseDescription}
+                  onChange={(e) => setExpenseDescription(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="expense-amount">Amount</Label>
+                <Input
+                  id="expense-amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="expense-category">Category</Label>
+                <select
+                  id="expense-category"
+                  value={expenseCategory}
+                  onChange={(e) => setExpenseCategory(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="general">General</option>
+                  <option value="office">Office Supplies</option>
+                  <option value="utilities">Utilities</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="marketing">Marketing</option>
+                  <option value="travel">Travel</option>
+                  <option value="food">Food & Beverages</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowAddExpense(false)
+                    setExpenseDescription('')
+                    setExpenseAmount('')
+                    setExpenseCategory('general')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleAddExpense}
+                  disabled={!expenseDescription.trim() || !expenseAmount || parseFloat(expenseAmount) <= 0}
+                >
+                  Add Expense
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1920,10 +2090,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 <DollarSign className="h-4 w-4 mr-2" />
                 Print Cash Drawer Report
               </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Archive className="h-4 w-4 mr-2" />
-                Print Inventory Report
-              </Button>
             </div>
           </div>
         </div>
@@ -1981,44 +2147,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
         </div>
       )}
 
-      {/* Coupon Management Dialog */}
-      {showCouponManagement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Coupon Management</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCouponManagement(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input placeholder="Create new coupon code..." />
-                <Button>Create</Button>
-              </div>
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-3">Active Coupons</h3>
-                <div className="space-y-2">
-                  {['SAVE10', 'WELCOME20', 'SUMMER15'].map((code) => (
-                    <div key={code} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <div>
-                        <p className="font-mono font-semibold">{code}</p>
-                        <p className="text-sm text-gray-600">10% off • Valid until 12/31/2024</p>
-                      </div>
-                      <Button size="sm" variant="outline">Deactivate</Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Product Filter Dialog */}
       {showProductFilter && (
@@ -2204,26 +2332,47 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       {/* Returns & Exchanges Dialog */}
       {showReturnsExchange && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="w-full h-full bg-white rounded-lg overflow-hidden">
-            <ReturnsIntegrationProvider>
-              <ReturnsExchange
-                mode="standalone"
-                onComplete={(result) => {
-                  console.log('Return completed:', result)
-                  setShowReturnsExchange(false)
-                  // Show success notification
-                  addNotification({
-                    id: Date.now().toString(),
-                    type: 'success',
-                    title: 'Return Processed',
-                    message: `Return ${result.id || 'transaction'} processed successfully`,
-                    timestamp: new Date(),
-                    isRead: false
-                  })
-                }}
-                onCancel={() => setShowReturnsExchange(false)}
-              />
-            </ReturnsIntegrationProvider>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header with close button */}
+            <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-50 to-red-50">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="h-6 w-6 text-orange-600" />
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                  Returns & Exchanges
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowReturnsExchange(false)}
+                className="hover:bg-red-100 hover:text-red-600"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
+              <ReturnsIntegrationProvider>
+                <ReturnsExchange
+                  mode="standalone"
+                  onComplete={(result) => {
+                    console.log('Return completed:', result)
+                    setShowReturnsExchange(false)
+                    // Show success notification
+                    addNotification({
+                      id: Date.now().toString(),
+                      type: 'success',
+                      title: 'Return Processed',
+                      message: `Return ${result.id || 'transaction'} processed successfully`,
+                      timestamp: new Date(),
+                      isRead: false
+                    })
+                  }}
+                  onCancel={() => setShowReturnsExchange(false)}
+                />
+              </ReturnsIntegrationProvider>
+            </div>
           </div>
         </div>
       )}
