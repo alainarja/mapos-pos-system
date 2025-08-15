@@ -1245,7 +1245,7 @@ export const useInventoryStore = create<InventoryState>()(
       }
     }),
     {
-      name: 'inventory-storage',
+      name: 'inventory-storage-v2', // Changed to force fresh start after category fix
       partialize: (state) => ({
         products: state.products,
         categories: state.categories,
