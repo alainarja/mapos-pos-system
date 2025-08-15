@@ -14,7 +14,33 @@ export async function GET(request: NextRequest) {
       parentOnly
     })
 
-    return NextResponse.json(response)
+    // Filter to only include Sales category and its children for POS
+    let filteredData = response.data
+    
+    if (Array.isArray(filteredData)) {
+      // Find the Sales category
+      const salesCategory = filteredData.find(cat => cat.name === 'Sales')
+      
+      if (salesCategory) {
+        if (includeHierarchy && salesCategory.children) {
+          // If hierarchy is requested, return Sales with its children
+          filteredData = [salesCategory]
+        } else {
+          // If flat structure, return Sales and all its children
+          const salesChildren = filteredData.filter(cat => cat.parent_id === salesCategory.id)
+          filteredData = [salesCategory, ...salesChildren]
+        }
+      } else {
+        // If no Sales category found, return empty array
+        filteredData = []
+      }
+    }
+
+    return NextResponse.json({
+      ...response,
+      data: filteredData,
+      count: filteredData.length
+    })
   } catch (error) {
     console.error('Error fetching categories:', error)
     return NextResponse.json(
