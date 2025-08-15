@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import localFont from "next/font/local"
 import { SoundProvider } from "@/components/sound-provider"
 import { GradientAnimation } from "@/components/ui/gradient-animation"
+import { InventoryLoader } from "@/components/inventory-loader"
 import "./globals.css"
 
 const inter = Inter({
@@ -42,6 +43,7 @@ export default function RootLayout({
           <div className="absolute inset-0 bg-gradient-to-br from-purple-50/80 via-white/90 to-violet-100/80 backdrop-blur-sm" />
         </div>
         <SoundProvider>
+          <InventoryLoader />
           {children}
         </SoundProvider>
       </body>

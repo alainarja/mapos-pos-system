@@ -67,7 +67,7 @@ interface InventoryState {
   setRefreshing: (refreshing: boolean) => void
   setAutoRefreshEnabled: (enabled: boolean) => void
   setAutoRefreshInterval: (minutes: number) => void
-  simulateServerSync: () => Promise<{ products: Product[]; categories: Category[]; timestamp: Date }>
+  loadInitialData: () => Promise<void>
   
   // Enhanced Search and Filter Actions
   setFilters: (filters: Partial<ProductFilter>) => void
@@ -529,22 +529,46 @@ export const useInventoryStore = create<InventoryState>()(
 
       // Refresh functionality
       refreshInventory: async () => {
-        const { setRefreshing, simulateServerSync } = get()
+        const { setRefreshing } = get()
         
         try {
           setRefreshing(true)
           
-          // Simulate network delay
-          await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
+          // Fetch data from real API
+          const response = await fetch('/api/inventory')
+          if (!response.ok) {
+            throw new Error('Failed to fetch inventory data')
+          }
           
-          // Simulate server sync
-          const serverData = await simulateServerSync()
+          const apiData = await response.json()
+          
+          // Transform API data to Product format
+          const products = apiData.data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            price: item.selling_price || item.price || 0,
+            cost: item.unit_price || 0,
+            category: item.category || 'Uncategorized',
+            image: item.imageUrl || item.image_url,
+            stock: item.quantity || 0,
+            barcode: item.sku,
+            sku: item.sku,
+            description: item.description || '',
+            minStock: 10, // Default values
+            maxStock: 100,
+            unit: item.areaUnit || 'piece',
+            supplier: 'External',
+            brand: 'Store',
+            isFeatured: false,
+            isNew: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }))
           
           // Update store with fresh data
           set({
-            products: serverData.products,
-            categories: serverData.categories,
-            lastRefresh: serverData.timestamp
+            products,
+            lastRefresh: new Date()
           })
           
           // Regenerate alerts with fresh data
@@ -572,38 +596,43 @@ export const useInventoryStore = create<InventoryState>()(
         set({ autoRefreshInterval: Math.max(1, Math.min(60, minutes)) }) // 1-60 minutes
       },
       
-      simulateServerSync: async (): Promise<{ products: Product[]; categories: Category[]; timestamp: Date }> => {
-        // Simulate fetching fresh data from server
-        // In a real app, this would be API calls
-        
-        // Simulate some inventory changes
-        const { products: currentProducts, categories } = get()
-        const refreshedProducts = currentProducts.map(product => {
-          // Simulate stock changes (realistic small adjustments)
-          const stockChange = Math.random() < 0.3 ? Math.floor(Math.random() * 10) - 5 : 0
-          const newStock = Math.max(0, product.stock + stockChange)
-          
-          // Simulate price updates (small adjustments)
-          const priceChange = Math.random() < 0.1 ? (Math.random() - 0.5) * 2 : 0
-          const newPrice = Math.max(0.01, product.price + priceChange)
-          
-          return {
-            ...product,
-            stock: newStock,
-            price: Number(newPrice.toFixed(2)),
-            updatedAt: new Date()
+      loadInitialData: async () => {
+        try {
+          const response = await fetch('/api/inventory')
+          if (!response.ok) {
+            console.warn('Failed to fetch initial inventory data, using mock data')
+            return
           }
-        })
-        
-        // Simulate random chance of server error
-        if (Math.random() < 0.05) { // 5% chance of failure
-          throw new Error('Server connection failed')
-        }
-        
-        return {
-          products: refreshedProducts,
-          categories, // Categories rarely change
-          timestamp: new Date()
+          
+          const apiData = await response.json()
+          
+          // Transform API data to Product format
+          const products = apiData.data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            price: item.selling_price || item.price || 0,
+            cost: item.unit_price || 0,
+            category: item.category || 'Uncategorized',
+            image: item.imageUrl || item.image_url,
+            stock: item.quantity || 0,
+            barcode: item.sku,
+            sku: item.sku,
+            description: item.description || '',
+            minStock: 10,
+            maxStock: 100,
+            unit: item.areaUnit || 'piece',
+            supplier: 'External',
+            brand: 'Store',
+            isFeatured: false,
+            isNew: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }))
+          
+          set({ products })
+          get().generateAlerts()
+        } catch (error) {
+          console.warn('Failed to load initial data:', error)
         }
       },
 
