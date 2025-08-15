@@ -33,6 +33,8 @@ import {
   DoorOpen,
   Volume2,
   VolumeX,
+  Menu,
+  ChevronLeft,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -68,6 +70,7 @@ interface MainSalesScreenProps {
 
 export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const { playSuccess, playError, playSpecial, playBeep, isEnabled, volume, setEnabled, setVolume } = useSound()
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Use Zustand stores
   const {
@@ -819,126 +822,190 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
           background: #e5e7eb;
         }
       `}</style>
+      {/* Sidebar */}
+      <div className={`fixed top-0 left-0 h-full bg-white/95 backdrop-blur-xl shadow-2xl transition-all duration-300 z-50 ${
+        isSidebarOpen ? 'w-64' : 'w-0'
+      } overflow-hidden`}>
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-gray-800">Quick Actions</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsSidebarOpen(false)}
+              className="hover:bg-gray-100"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          <div className="space-y-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-emerald-50 hover:text-emerald-700"
+              onClick={() => {
+                setShowCashManagement(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <DollarSign className="h-5 w-5" />
+              <span>Cash Management</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-cyan-50 hover:text-cyan-700"
+              onClick={() => {
+                setShowOpenDrawer(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <DoorOpen className="h-5 w-5" />
+              <span>Open Cash Drawer</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-blue-50 hover:text-blue-700"
+              onClick={() => {
+                setShowPrintMenu(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <Printer className="h-5 w-5" />
+              <span>Print Menu</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-purple-50 hover:text-purple-700"
+              onClick={() => {
+                setShowHistory(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <History className="h-5 w-5" />
+              <span>Sales History</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-orange-50 hover:text-orange-700"
+              onClick={() => {
+                setShowReturnsExchange(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <RotateCcw className="h-5 w-5" />
+              <span>Returns & Exchanges</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-pink-50 hover:text-pink-700"
+              onClick={() => {
+                setShowCouponManagement(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <Tag className="h-5 w-5" />
+              <span>Coupon Management</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-indigo-50 hover:text-indigo-700"
+              onClick={() => {
+                setShowCustomerDisplay(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <Monitor className="h-5 w-5" />
+              <span>Customer Display</span>
+            </Button>
+            
+            <div className="border-t pt-4 mt-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Sound Effects</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEnabled(!isEnabled)}
+                    className={`${
+                      isEnabled 
+                        ? 'text-green-600' 
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {isEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-gray-500" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={volume}
+                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-600 min-w-[2rem]">
+                    {Math.round(volume * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl border-purple-100 border-b px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Left - Logo */}
+          {/* Left - Menu Toggle */}
           <div className="flex items-center gap-4">
-            <div className="relative group">
-              <Image
-                src="/images/mapos-logo.png"
-                alt="MAPOS"
-                width={48}
-                height={48}
-                className="drop-shadow-lg transform group-hover:scale-110 transition-all duration-300"
-              />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsSidebarOpen(true)}
+              className="hover:bg-purple-50"
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+          </div>
+
+          {/* Center - Logo and Store Name */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="relative group">
+                <Image
+                  src="/images/mapos-logo.png"
+                  alt="MAPOS"
+                  width={48}
+                  height={48}
+                  className="drop-shadow-lg transform group-hover:scale-110 transition-all duration-300"
+                />
+              </div>
+              <div className="px-8 py-3 rounded-xl font-bruno-ace text-2xl font-bold bg-gradient-to-r from-purple-600 via-violet-600 to-blue-600 text-white shadow-lg">
+                MAPOS
+              </div>
             </div>
           </div>
 
-          {/* Center - Store Name */}
-          <div className="flex items-center gap-4">
-            <div className="px-8 py-3 rounded-xl font-bruno-ace text-xl font-bold bg-gradient-to-r from-purple-600 via-violet-600 to-blue-600 text-white">
-              MAPOS
-            </div>
-          </div>
-
-          {/* Right - Actions and User */}
+          {/* Right - User Info and Actions */}
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCashManagement(true)}
-              className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:scale-110 transition-all duration-300"
-              title="Cash Management"
-            >
-              <DollarSign className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowOpenDrawer(true)}
-              className="w-10 h-10 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 hover:scale-110 transition-all duration-300"
-              title="Open Cash Drawer (Ctrl+D)"
-            >
-              <DoorOpen className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowPrintMenu(true)}
-              className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:scale-110 transition-all duration-300"
-              title="Print Menu"
-            >
-              <Printer className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowHistory(true)}
-              className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 hover:scale-110 transition-all duration-300"
-              title="Sales History"
-            >
-              <History className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowReturnsExchange(true)}
-              className="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 hover:scale-110 transition-all duration-300"
-              title="Returns & Exchanges"
-            >
-              <RotateCcw className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCouponManagement(true)}
-              className="w-10 h-10 rounded-lg bg-pink-50 text-pink-600 hover:bg-pink-100 hover:scale-110 transition-all duration-300"
-              title="Coupon Management"
-            >
-              <Tag className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCustomerDisplay(true)}
-              className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:scale-110 transition-all duration-300"
-              title="Customer Display View (F9)"
-            >
-              <Monitor className="h-5 w-5" />
-            </Button>
-            
-            {/* Sound Controls */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEnabled(!isEnabled)}
-              className={`w-10 h-10 rounded-lg transition-all duration-300 hover:scale-110 ${
-                isEnabled 
-                  ? 'bg-green-50 text-green-600 hover:bg-green-100' 
-                  : 'bg-red-50 text-red-600 hover:bg-red-100'
-              }`}
-              title={`Sound ${isEnabled ? 'On' : 'Off'} - Click to toggle`}
-            >
-              {isEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-            </Button>
-            
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
-              <Volume2 className="h-4 w-4 text-gray-600" />
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                title={`Volume: ${Math.round(volume * 100)}%`}
-              />
-              <span className="text-xs text-gray-600 font-medium min-w-[2rem]">
-                {Math.round(volume * 100)}%
-              </span>
-            </div>
             
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50/80 border border-purple-200/60">
               <User className="h-4 w-4 text-purple-600" />
