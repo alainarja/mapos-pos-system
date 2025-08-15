@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useImperativeHandle, forwardRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { SoundButton } from "@/components/ui/sound-button"
@@ -15,12 +15,17 @@ interface PinLockProps {
   subtitle?: string
 }
 
-export function PinLock({
+export interface PinLockRef {
+  handleAuthResult: (success: boolean) => void
+  clearPin: () => void
+}
+
+export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
   onUnlock,
   onBack,
   title = "Enter PIN",
   subtitle = "Enter your 4-digit PIN to continue",
-}: PinLockProps) {
+}, ref) => {
   const [pin, setPin] = useState("")
   const [isShaking, setIsShaking] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
@@ -39,15 +44,10 @@ export function PinLock({
       if (newPin.length === 4) {
         setIsProcessing(true)
         setTimeout(() => {
-          if (newPin === "1234") {
-            playSuccess() // Play success sound for correct PIN
-            onUnlock(newPin)
-          } else {
-            playError() // Play error sound for wrong PIN
-            handleFailedAttempt()
-          }
+          // Pass the PIN to the parent component for authentication
+          onUnlock(newPin)
           setIsProcessing(false)
-        }, 800)
+        }, 300)
       }
     }
   }
@@ -69,6 +69,7 @@ export function PinLock({
     const newFailedAttempts = failedAttempts + 1
     setFailedAttempts(newFailedAttempts)
     setIsShaking(true)
+    playError() // Play error sound for wrong PIN
 
     setTimeout(() => {
       setPin("")
@@ -81,6 +82,20 @@ export function PinLock({
       setLockoutTime(30) // 30 seconds lockout
     }
   }
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    handleAuthResult: (success: boolean) => {
+      if (success) {
+        playSuccess()
+      } else {
+        handleFailedAttempt()
+      }
+    },
+    clearPin: () => {
+      setPin("")
+    }
+  }))
 
   // Lockout countdown
   useEffect(() => {
@@ -255,9 +270,6 @@ export function PinLock({
           </CardContent>
         </Card>
 
-        <div className="text-center mt-6 text-purple-200/60 text-xs animate-fade-in" style={{ animationDelay: "1s" }}>
-          <p>Demo PIN: 1234</p>
-        </div>
       </div>
 
       <style jsx>{`
@@ -301,4 +313,6 @@ export function PinLock({
       `}</style>
     </div>
   )
-}
+})
+
+PinLock.displayName = 'PinLock'

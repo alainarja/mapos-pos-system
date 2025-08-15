@@ -281,13 +281,14 @@ class MaposUsersAuthService {
 
   /**
    * Mock PIN authentication for development/testing
+   * Supports both dedicated PINs and numeric passwords as PINs
    */
   private async mockPinLogin(pin: string, userId?: string): Promise<AuthResponse> {
     await new Promise(resolve => setTimeout(resolve, 300)) // Simulate API delay
 
-    // Mock PIN mappings
-    const pinMappings: Record<string, AuthUser> = {
-      '1234': {
+    // Mock users
+    const mockUsers: Record<string, AuthUser> = {
+      'mock_manager_id': {
         id: 'mock_manager_id',
         email: 'manager@pos.com',
         fullName: 'Store Manager',
@@ -298,7 +299,7 @@ class MaposUsersAuthService {
         modules: ['POS', 'Sales', 'Inventory', 'CRM'],
         authMethod: 'pin'
       },
-      '5678': {
+      'mock_cashier_id': {
         id: 'mock_cashier_id',
         email: 'cashier@pos.com',
         fullName: 'Store Cashier',
@@ -311,10 +312,26 @@ class MaposUsersAuthService {
       }
     }
 
-    if (pinMappings[pin]) {
+    // PIN to user mappings - supports both dedicated PINs and passwords as PINs
+    const pinToUserMappings: Record<string, string> = {
+      // Dedicated PINs
+      '1234': 'mock_manager_id',    
+      '5678': 'mock_cashier_id',    
+      '9999': 'mock_manager_id',    // Additional manager PIN
+      '1111': 'mock_cashier_id',    // Additional cashier PIN
+      
+      // Numeric passwords that can work as PINs
+      '2024': 'mock_manager_id',    // Example: year as password/PIN
+      '0000': 'mock_cashier_id',    // Example: simple numeric password
+    }
+
+    const matchedUserId = pinToUserMappings[pin]
+    const user = matchedUserId ? mockUsers[matchedUserId] : null
+
+    if (user) {
       return {
         success: true,
-        user: pinMappings[pin],
+        user: user,
         tokens: {
           accessToken: 'mock_pin_access_token_' + Date.now(),
           refreshToken: 'mock_pin_refresh_token_' + Date.now(),
