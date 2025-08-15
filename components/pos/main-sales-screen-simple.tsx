@@ -925,7 +925,19 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
             </Button>
             
             <div className="border-t pt-4 mt-4">
-              <div className="space-y-3">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-12 px-4 hover:bg-green-50 hover:text-green-700"
+                onClick={() => {
+                  toggleTrainingMode()
+                  setIsSidebarOpen(false)
+                }}
+              >
+                {isTrainingMode ? '🎓' : '📚'}
+                <span>{isTrainingMode ? 'Training Mode ON' : 'Training Mode'}</span>
+              </Button>
+              
+              <div className="space-y-3 mt-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Sound Effects</span>
                   <Button
@@ -957,6 +969,21 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                     {Math.round(volume * 100)}%
                   </span>
                 </div>
+              </div>
+              
+              <div className="border-t pt-4 mt-4">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-12 px-4 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => {
+                    if (confirm(`Complete shift for ${user}? This will log you out and end your current session.`)) {
+                      onLogout()
+                    }
+                  }}
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Complete Shift</span>
+                </Button>
               </div>
             </div>
           </div>
@@ -1004,46 +1031,12 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
             </div>
           </div>
 
-          {/* Right - User Info and Actions */}
+          {/* Right - User Info Only */}
           <div className="flex items-center gap-3">
-            
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50/80 border border-purple-200/60">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/50 backdrop-blur-sm border border-purple-200/40">
               <User className="h-4 w-4 text-purple-600" />
-              <span className="text-sm font-medium text-purple-800">{user}</span>
+              <span className="text-sm font-semibold text-purple-900">{user}</span>
             </div>
-            
-            <SoundButton
-              variant="outline"
-              size="sm"
-              soundType="click"
-              onClick={toggleTrainingMode}
-              className={`h-10 px-4 rounded-lg transition-all duration-300 flex items-center gap-2 font-medium ${
-                isTrainingMode 
-                  ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' 
-                  : 'bg-blue-50/80 border-blue-200/60 text-blue-700 hover:bg-blue-100 hover:border-blue-300'
-              }`}
-            >
-              {isTrainingMode ? '🎓' : '📚'}
-              <span className="hidden sm:inline">
-                {isTrainingMode ? 'Training ON' : 'Training'}
-              </span>
-            </SoundButton>
-            
-            <SoundButton
-              variant="outline"
-              size="sm"
-              soundType="click"
-              onClick={() => {
-                if (confirm(`Complete shift for ${user}? This will log you out and end your current session.`)) {
-                  onLogout()
-                }
-              }}
-              className="h-10 px-4 rounded-lg bg-red-50/80 border-red-200/60 text-red-700 hover:bg-red-100 hover:border-red-300 transition-all duration-300 flex items-center gap-2 font-medium"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Complete Shift</span>
-              <span className="sm:hidden">Logout</span>
-            </SoundButton>
           </div>
         </div>
       </header>
