@@ -35,6 +35,9 @@ import {
   VolumeX,
   Menu,
   ChevronLeft,
+  Edit3,
+  Check,
+  Move,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -149,6 +152,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [drawerReason, setDrawerReason] = useState('')
   const [showDrawerApproval, setShowDrawerApproval] = useState(false)
   const [drawerManagerPassword, setDrawerManagerPassword] = useState('')
+  const [showQuickKeysConfig, setShowQuickKeysConfig] = useState(false)
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
+  const [searchConfigTerm, setSearchConfigTerm] = useState('')
 
   const addToCart = (product: Product) => {
     addItem(product)
@@ -282,10 +288,25 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
 
   const filteredProducts = getEnhancedFilteredProducts()
 
-  // Initialize Quick Keys with popular products
+  // Initialize Quick Keys with saved configuration or popular products
   useEffect(() => {
-    const popularProducts = mockProducts.slice(0, 8) // Get first 8 products as quick keys
-    setQuickKeyProducts(popularProducts)
+    const savedQuickKeys = localStorage.getItem('mapos-quick-keys')
+    if (savedQuickKeys) {
+      try {
+        const savedIds = JSON.parse(savedQuickKeys)
+        const savedProducts = mockProducts.filter(product => savedIds.includes(product.id))
+        // Maintain the order from saved configuration
+        const orderedProducts = savedIds.map(id => mockProducts.find(p => p.id === id)).filter(Boolean)
+        setQuickKeyProducts(orderedProducts)
+      } catch (error) {
+        console.warn('Failed to load saved Quick Keys, using defaults')
+        const popularProducts = mockProducts.slice(0, 8)
+        setQuickKeyProducts(popularProducts)
+      }
+    } else {
+      const popularProducts = mockProducts.slice(0, 8) // Get first 8 products as quick keys
+      setQuickKeyProducts(popularProducts)
+    }
   }, [mockProducts])
 
   // Enhanced keyboard shortcuts
@@ -1107,14 +1128,28 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                   <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-[0_8px_30px_rgba(139,92,246,0.1)] border border-purple-100">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-slate-800">Quick Keys</h3>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setShowQuickKeys(false)}
-                        className="h-8 w-8 p-0"
-                      >
-                        ✕
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setShowQuickKeysConfig(true)
+                            setSelectedProducts([...quickKeyProducts])
+                          }}
+                          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                          title="Configure Quick Keys"
+                        >
+                          <Settings className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setShowQuickKeys(false)}
+                          className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                        >
+                          ✕
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-4 gap-3 mb-4">
                       {quickKeyProducts.map((product, index) => (
@@ -1162,7 +1197,8 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                         size="sm"
                         onClick={() => {
                           // Clear all quick keys
-                          setQuickKeyProducts(new Array(8).fill(null))
+                          setQuickKeyProducts([])
+                          localStorage.removeItem('mapos-quick-keys')
                         }}
                         className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
                       >
@@ -2797,6 +2833,236 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                     <p className="text-sm text-gray-500 mt-2">Press F9 or ESC to close this display</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Keys Configuration Dialog */}
+      {showQuickKeysConfig && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                Configure Quick Keys
+              </h2>
+              <Button
+                onClick={() => {
+                  setShowQuickKeysConfig(false)
+                  setSelectedProducts([])
+                  setSearchConfigTerm('')
+                }}
+                variant="ghost"
+                size="sm"
+                className="hover:bg-red-50 hover:text-red-600"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Current Quick Keys */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Quick Keys</h3>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {quickKeyProducts.map((product, index) => product ? (
+                    <div
+                      key={product.id}
+                      className="p-3 rounded-lg border border-purple-200 bg-purple-50/50 relative group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Move className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{product.name}</p>
+                          <p className="text-green-600 font-semibold">${product.price}</p>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            const updatedProducts = [...quickKeyProducts]
+                            updatedProducts[index] = null
+                            setQuickKeyProducts(updatedProducts.filter(p => p !== null))
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      key={`empty-${index}`}
+                      className="p-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center min-h-[60px]"
+                    >
+                      <p className="text-gray-400 text-sm">Empty Slot</p>
+                    </div>
+                  ))}
+                  {/* Add empty slots if less than 8 */}
+                  {Array.from({ length: Math.max(0, 8 - quickKeyProducts.length) }).map((_, index) => (
+                    <div
+                      key={`new-empty-${index}`}
+                      className="p-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center min-h-[60px]"
+                    >
+                      <p className="text-gray-400 text-sm">Empty Slot</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      const newQuickKeys = selectedProducts.slice(0, 8)
+                      setQuickKeyProducts(newQuickKeys)
+                      // Save to localStorage
+                      localStorage.setItem('mapos-quick-keys', JSON.stringify(newQuickKeys.map(p => p.id)))
+                      setSelectedProducts([])
+                    }}
+                    disabled={selectedProducts.length === 0}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    Apply Selected ({selectedProducts.length})
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setQuickKeyProducts([])
+                      localStorage.removeItem('mapos-quick-keys')
+                    }}
+                    variant="outline"
+                    className="hover:bg-red-50 hover:text-red-600"
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Product Selection */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Select Products</h3>
+                
+                {/* Search Bar */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search products..."
+                    value={searchConfigTerm}
+                    onChange={(e) => setSearchConfigTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
+                {/* Selected Products Counter */}
+                {selectedProducts.length > 0 && (
+                  <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <p className="text-blue-800 text-sm font-medium">
+                      {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+                      {selectedProducts.length > 8 && " (only first 8 will be used)"}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Products Grid */}
+                <div className="max-h-96 overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-2">
+                    {filteredProducts
+                      .filter(product => 
+                        searchConfigTerm === '' || 
+                        product.name.toLowerCase().includes(searchConfigTerm.toLowerCase()) ||
+                        product.category.toLowerCase().includes(searchConfigTerm.toLowerCase())
+                      )
+                      .map((product) => {
+                        const isSelected = selectedProducts.some(p => p.id === product.id)
+                        const isInQuickKeys = quickKeyProducts.some(p => p?.id === product.id)
+                        
+                        return (
+                          <div
+                            key={product.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedProducts(selectedProducts.filter(p => p.id !== product.id))
+                              } else {
+                                setSelectedProducts([...selectedProducts, product])
+                              }
+                            }}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-purple-300 bg-purple-100'
+                                : isInQuickKeys
+                                ? 'border-green-300 bg-green-50'
+                                : 'border-gray-200 bg-white hover:border-purple-200 hover:bg-purple-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                                isSelected
+                                  ? 'border-purple-500 bg-purple-500'
+                                  : 'border-gray-300'
+                              }`}>
+                                {isSelected && <Check className="h-3 w-3 text-white" />}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-sm truncate">{product.name}</p>
+                                  {isInQuickKeys && (
+                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                                      In Quick Keys
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">{product.category}</p>
+                                <p className="text-green-600 font-semibold">${product.price}</p>
+                              </div>
+                              
+                              <div className="text-right">
+                                <p className={`text-xs ${
+                                  product.stock > 0 ? 'text-green-600' : 'text-red-500'
+                                }`}>
+                                  {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center mt-6 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                <p>Tips: Select up to 8 products for your Quick Keys. You can rearrange them by dragging.</p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => {
+                    setShowQuickKeysConfig(false)
+                    setSelectedProducts([])
+                    setSearchConfigTerm('')
+                  }}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedProducts.length > 0) {
+                      const newQuickKeys = selectedProducts.slice(0, 8)
+                      setQuickKeyProducts(newQuickKeys)
+                      // Save to localStorage
+                      localStorage.setItem('mapos-quick-keys', JSON.stringify(newQuickKeys.map(p => p.id)))
+                    }
+                    setShowQuickKeysConfig(false)
+                    setSelectedProducts([])
+                    setSearchConfigTerm('')
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  Save Configuration
+                </Button>
               </div>
             </div>
           </div>
