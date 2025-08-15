@@ -1245,7 +1245,7 @@ export const useInventoryStore = create<InventoryState>()(
       }
     }),
     {
-      name: 'inventory-storage-v2', // Changed to force fresh start after category fix
+      name: 'inventory-storage-v3', // Force fresh start after fixing main-sales-screen-simple.tsx
       partialize: (state) => ({
         products: state.products,
         categories: state.categories,
