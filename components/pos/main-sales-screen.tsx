@@ -903,7 +903,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                     key={category.name}
                     className="cursor-pointer group"
                     onClick={() => {
-                      setSelectedCategory(category.id)
+                      setSelectedCategory(category.name)
                       setShowCategorySelection(false)
                     }}
                     variants={gridItemVariants}

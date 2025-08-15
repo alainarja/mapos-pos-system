@@ -472,10 +472,8 @@ export const useInventoryStore = create<InventoryState>()(
         let filtered = products
 
         if (selectedCategory !== "All") {
-          const category = categories.find(c => c.id === selectedCategory)
-          if (category) {
-            filtered = filtered.filter(product => product.category === category.name)
-          }
+          // Direct filtering by category name since selectedCategory is now the category name
+          filtered = filtered.filter(product => product.category === selectedCategory)
         }
 
         if (searchTerm) {
