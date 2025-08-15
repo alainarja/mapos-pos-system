@@ -1057,7 +1057,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
 
       <div className={`flex ${isTrainingMode ? 'h-[calc(100vh-148px)]' : 'h-[calc(100vh-88px)]'}`}>
         {/* Main Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 overflow-y-auto">
           {showCategorySelection ? (
             <div className="max-w-4xl mx-auto">
 
@@ -1357,7 +1357,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
         </div>
 
         {/* Cart Sidebar */}
-        <div className="w-96 border-l bg-white/80 backdrop-blur-xl border-purple-100 p-6">
+        <div className="w-96 border-l bg-white/80 backdrop-blur-xl border-purple-100 p-6 flex flex-col max-h-full">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
               Cart
@@ -1430,7 +1430,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
           ) : (
             <>
               {/* Cart Items */}
-              <div className="flex-1 space-y-3 mb-6 max-h-96 overflow-y-auto">
+              <div className="flex-1 space-y-3 mb-6 overflow-y-auto min-h-0">
                 {cart.map((item) => (
                   <div
                     key={item.id}
