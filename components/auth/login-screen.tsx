@@ -13,9 +13,10 @@ import { containerVariants, itemVariants, floatVariants, loadingVariants } from 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => void
   onPinMode: () => void
+  errorMessage?: string | null
 }
 
-export function LoginScreen({ onLogin, onPinMode }: LoginScreenProps) {
+export function LoginScreen({ onLogin, onPinMode, errorMessage }: LoginScreenProps) {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -205,6 +206,15 @@ export function LoginScreen({ onLogin, onPinMode }: LoginScreenProps) {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </motion.button>
               </motion.div>
+
+              {errorMessage && (
+                <motion.div 
+                  variants={itemVariants}
+                  className="text-red-400 text-sm text-center bg-red-900/20 px-3 py-2 rounded-md border border-red-400/30 animate-pulse"
+                >
+                  {errorMessage}
+                </motion.div>
+              )}
 
               <motion.div variants={itemVariants}>
                 <Button

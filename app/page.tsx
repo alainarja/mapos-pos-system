@@ -14,17 +14,21 @@ export default function HomePage() {
   const [authMode, setAuthMode] = useState<AuthMode>("login")
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
   const pinLockRef = useRef<PinLockRef>(null)
 
   const handleLogin = async (username: string, password: string) => {
     setIsLoading(true)
+    setLoginError(null)
     try {
       const response = await maposUsersAuth.loginWithPassword({ email: username, password })
       setUser(response.user)
       setAuthMode("authenticated")
+      setLoginError(null)
     } catch (error) {
       console.error('Login failed:', error)
-      // The LoginScreen should handle showing error messages
+      const errorMessage = error instanceof Error ? error.message : 'Login failed'
+      setLoginError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -49,7 +53,14 @@ export default function HomePage() {
   }
 
   if (authMode === "login") {
-    return <LoginScreen onLogin={handleLogin} onPinMode={() => setAuthMode("pin")} />
+    return <LoginScreen 
+      onLogin={handleLogin} 
+      onPinMode={() => {
+        setLoginError(null)
+        setAuthMode("pin")
+      }} 
+      errorMessage={loginError}
+    />
   }
 
   if (authMode === "pin") {
