@@ -1,4 +1,5 @@
 // Service to handle authentication with maposusers service
+// Force rebuild to update environment variables - 2025-08-16T10:30:00Z
 export interface AuthConfig {
   baseUrl: string
   apiKey: string
@@ -50,8 +51,8 @@ class MaposUsersAuthService {
 
   constructor() {
     this.config = {
-      baseUrl: process.env.NEXT_PUBLIC_MAPOS_USERS_API_URL || 'https://marbleusers.vercel.app',
-      apiKey: process.env.NEXT_PUBLIC_MAPOS_USERS_API_KEY || 'development_mapos_users_key'
+      baseUrl: process.env.NEXT_PUBLIC_MAPOS_USERS_API_URL || '',
+      apiKey: process.env.NEXT_PUBLIC_MAPOS_USERS_API_KEY || ''
     }
 
     if (!this.config.baseUrl || !this.config.apiKey) {
