@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Deployed POS Authentication</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .debug { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Deployed POS Authentication</h1>
+    
+    <div class="info">
+        <h3>🎯 Purpose:</h3>
+        <p>This page will help debug why the deployed POS at <a href="https://mapos-pos-system.vercel.app/">https://mapos-pos-system.vercel.app/</a> might not be showing authentication errors.</p>
+    </div>
+    
+    <div class="debug">
+        <h3>🔧 Checking Browser Environment:</h3>
+        <div id="env-check"></div>
+    </div>
+    
+    <div class="debug">
+        <h3>🌐 Testing API Connections:</h3>
+        <div id="api-tests"></div>
+    </div>
+    
+    <div class="debug">
+        <h3>📝 Instructions:</h3>
+        <ol>
+            <li>Open this page on the deployed POS domain: <code>https://mapos-pos-system.vercel.app/debug-deployed-auth.html</code></li>
+            <li>Check the environment variables and API connection results</li>
+            <li>Test PIN authentication manually to see error behavior</li>
+        </ol>
+    </div>
+    
+    <script>
+        // Check environment variables available in browser
+        function checkEnvironment() {
+            const envDiv = document.getElementById('env-check');
+            
+            // Check if environment variables are available
+            const envVars = {
+                'NEXT_PUBLIC_MAPOS_USERS_API_URL': window.location.origin.includes('vercel.app') ? 'Should be production URL' : 'Not set',
+                'NEXT_PUBLIC_MAPOS_USERS_API_KEY': 'Should be set',
+                'Current Domain': window.location.origin,
+                'User Agent': navigator.userAgent.substring(0, 100) + '...'
+            };
+            
+            for (const [key, expected] of Object.entries(envVars)) {
+                const div = document.createElement('div');
+                div.innerHTML = `<strong>${key}:</strong> ${expected}`;
+                envDiv.appendChild(div);
+            }
+        }
+        
+        // Test API connections
+        async function testAPIConnections() {
+            const apiDiv = document.getElementById('api-tests');
+            
+            // Possible MaposUsers URLs to test
+            const testUrls = [
+                'https://mapos-users.vercel.app',
+                'https://maposusers.vercel.app',
+                'http://localhost:3001',
+                'https://mapos-users-git-main-mapos-devs.vercel.app'
+            ];
+            
+            for (const url of testUrls) {
+                const div = document.createElement('div');
+                div.className = 'test-result';
+                div.innerHTML = `<strong>Testing ${url}:</strong> `;
+                
+                try {
+                    // Test a simple endpoint first
+                    const response = await fetch(`${url}/api/test-data`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        div.className += ' success';
+                        div.innerHTML += '✅ REACHABLE';
+                        
+                        // Test PIN authentication
+                        try {
+                            const authResponse = await fetch(`${url}/api/external/pos-auth`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-api-key': 'development_mapos_users_key'
+                                },
+                                body: JSON.stringify({
+                                    type: 'pin',
+                                    pin: '0000'
+                                })
+                            });
+                            
+                            const authData = await authResponse.json();
+                            if (authData.error) {
+                                div.innerHTML += ' - PIN AUTH WORKING (correctly rejects invalid PIN)';
+                            } else {
+                                div.innerHTML += ' - PIN AUTH ISSUE (accepts invalid PIN)';
+                            }
+                        } catch (authError) {
+                            div.innerHTML += ` - PIN AUTH ERROR: ${authError.message}`;
+                        }
+                    } else {
+                        div.className += ' error';
+                        div.innerHTML += `❌ HTTP ${response.status}`;
+                    }
+                } catch (error) {
+                    div.className += ' error';
+                    div.innerHTML += `❌ ${error.message}`;
+                }
+                
+                apiDiv.appendChild(div);
+            }
+            
+            // Add instructions
+            const instructionDiv = document.createElement('div');
+            instructionDiv.className = 'info';
+            instructionDiv.innerHTML = `
+                <h4>📋 Next Steps:</h4>
+                <p>1. If no URLs are reachable, the MaposUsers service might not be deployed</p>
+                <p>2. If a URL is reachable but PIN auth fails, check API keys and CORS settings</p>
+                <p>3. Update the POS environment variables to point to the working MaposUsers URL</p>
+            `;
+            apiDiv.appendChild(instructionDiv);
+        }
+        
+        // Run checks when page loads
+        window.onload = async () => {
+            checkEnvironment();
+            await testAPIConnections();
+        };
+    </script>
+</body>
+</html>
