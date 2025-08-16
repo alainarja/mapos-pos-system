@@ -36,7 +36,8 @@ export default function HomePage() {
       pinLockRef.current?.handleAuthResult(true)
     } catch (error) {
       console.error('PIN authentication failed:', error)
-      pinLockRef.current?.handleAuthResult(false)
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
+      pinLockRef.current?.handleAuthResult(false, errorMessage)
     }
   }
 

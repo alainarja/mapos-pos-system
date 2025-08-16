@@ -16,7 +16,7 @@ interface PinLockProps {
 }
 
 export interface PinLockRef {
-  handleAuthResult: (success: boolean) => void
+  handleAuthResult: (success: boolean, error?: string) => void
   clearPin: () => void
 }
 
@@ -32,6 +32,7 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
   const [lockoutTime, setLockoutTime] = useState(0)
   const [failedAttempts, setFailedAttempts] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { playBeep, playSuccess, playError } = useSound()
 
   const handleNumberClick = (number: string) => {
@@ -65,16 +66,24 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
     }
   }
 
-  const handleFailedAttempt = () => {
+  const handleFailedAttempt = (error?: string) => {
     const newFailedAttempts = failedAttempts + 1
     setFailedAttempts(newFailedAttempts)
     setIsShaking(true)
     playError() // Play error sound for wrong PIN
 
+    // Set appropriate error message
+    if (error?.includes('fetch') || error?.includes('CORS') || error?.includes('ERR_FAILED')) {
+      setErrorMessage("Connection error. Please check your network.")
+    } else {
+      setErrorMessage("Invalid PIN. Please try again.")
+    }
+
     setTimeout(() => {
       setPin("")
       setIsShaking(false)
-    }, 1000)
+      setErrorMessage(null) // Clear error message after a delay
+    }, 3000)
 
     // Lock after 3 failed attempts
     if (newFailedAttempts >= 3) {
@@ -85,11 +94,12 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
-    handleAuthResult: (success: boolean) => {
+    handleAuthResult: (success: boolean, error?: string) => {
       if (success) {
         playSuccess()
+        setErrorMessage(null)
       } else {
-        handleFailedAttempt()
+        handleFailedAttempt(error)
       }
     },
     clearPin: () => {
@@ -180,6 +190,11 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
           )}
           {failedAttempts > 0 && !isLocked && (
             <p className="text-orange-400 text-sm mt-2">{3 - failedAttempts} attempts remaining</p>
+          )}
+          {errorMessage && (
+            <p className="text-red-400 text-sm mt-2 animate-pulse bg-red-900/20 px-3 py-1 rounded-md border border-red-400/30">
+              {errorMessage}
+            </p>
           )}
         </div>
 
