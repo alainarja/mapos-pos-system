@@ -59,6 +59,31 @@ interface Product {
   barcode?: string
 }
 
+interface Service {
+  id: string
+  name: string
+  description: string
+  price: number
+  unit: string
+  category: string
+  active: boolean
+  duration?: number // in minutes
+}
+
+interface DisplayItem {
+  id: string
+  name: string
+  price: number
+  category: string
+  image?: string
+  stock?: number
+  barcode?: string
+  type: 'product' | 'service'
+  description?: string
+  duration?: number
+  unit?: string
+}
+
 interface CartItem {
   id: string
   name: string
@@ -97,6 +122,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   
   const {
     products: mockProducts,
+    services,
     categories,
     selectedCategory,
     searchTerm,
@@ -161,8 +187,23 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('general')
 
-  const addToCart = (product: Product) => {
-    addItem(product)
+  const addToCart = (item: DisplayItem) => {
+    // Transform DisplayItem to cart-compatible format
+    const cartItem = {
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image || (item.type === 'service' ? '/placeholder-service.svg' : '/placeholder.svg'),
+      category: item.category,
+      stock: item.stock || (item.type === 'service' ? 999 : 0), // Services have unlimited "stock"
+      barcode: item.barcode,
+      type: item.type,
+      description: item.description,
+      duration: item.duration,
+      unit: item.unit
+    }
+    
+    addItem(cartItem)
     
     // Play special sound for adding to cart
     playSpecial()
@@ -234,34 +275,63 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     return matches / Math.max(queryLower.length, textLower.length)
   }
 
-  // Advanced search function
-  const getAdvancedFilteredProducts = () => {
-    let products = mockProducts
+  // Advanced search function that combines products and services
+  const getAdvancedFilteredProducts = (): DisplayItem[] => {
+    // Transform products to DisplayItem format
+    const productItems: DisplayItem[] = mockProducts.map(product => ({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      category: product.category,
+      image: product.image,
+      stock: product.stock,
+      barcode: product.barcode,
+      type: 'product' as const
+    }))
+    
+    // Transform services to DisplayItem format
+    const serviceItems: DisplayItem[] = services
+      .filter(service => service.active)
+      .map(service => ({
+        id: service.id,
+        name: service.name,
+        price: service.price,
+        category: service.category,
+        type: 'service' as const,
+        description: service.description,
+        duration: service.duration,
+        unit: service.unit,
+        image: '/services-icon.svg' // Default service icon
+      }))
+    
+    // Combine products and services
+    let allItems = [...productItems, ...serviceItems]
     const query = searchTerm.toLowerCase().trim()
     
     if (query) {
-      products = products.filter(product => {
+      allItems = allItems.filter(item => {
         const searchTargets = []
         
         // Determine what to search based on mode
         switch (searchMode) {
           case 'name':
-            searchTargets.push(product.name.toLowerCase())
+            searchTargets.push(item.name.toLowerCase())
             break
           case 'barcode':
-            if (product.barcode) searchTargets.push(product.barcode.toLowerCase())
+            if (item.barcode) searchTargets.push(item.barcode.toLowerCase())
             break
           case 'sku':
-            searchTargets.push(product.id.toLowerCase()) // Use ID as SKU
+            searchTargets.push(item.id.toLowerCase()) // Use ID as SKU
             break
           case 'all':
           default:
             searchTargets.push(
-              product.name.toLowerCase(),
-              product.category.toLowerCase(),
-              product.id.toLowerCase()
+              item.name.toLowerCase(),
+              item.category.toLowerCase(),
+              item.id.toLowerCase()
             )
-            if (product.barcode) searchTargets.push(product.barcode.toLowerCase())
+            if (item.barcode) searchTargets.push(item.barcode.toLowerCase())
+            if (item.description) searchTargets.push(item.description.toLowerCase())
             break
         }
         
@@ -275,18 +345,20 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       
       // Sort by relevance if using fuzzy search
       if (fuzzySearchEnabled) {
-        products.sort((a, b) => {
+        allItems.sort((a, b) => {
           const aScore = Math.max(
             fuzzySearch(query, a.name.toLowerCase()),
             fuzzySearch(query, a.category.toLowerCase()),
             fuzzySearch(query, a.id.toLowerCase()),
-            a.barcode ? fuzzySearch(query, a.barcode.toLowerCase()) : 0
+            a.barcode ? fuzzySearch(query, a.barcode.toLowerCase()) : 0,
+            a.description ? fuzzySearch(query, a.description.toLowerCase()) : 0
           )
           const bScore = Math.max(
             fuzzySearch(query, b.name.toLowerCase()),
             fuzzySearch(query, b.category.toLowerCase()),
             fuzzySearch(query, b.id.toLowerCase()),
-            b.barcode ? fuzzySearch(query, b.barcode.toLowerCase()) : 0
+            b.barcode ? fuzzySearch(query, b.barcode.toLowerCase()) : 0,
+            b.description ? fuzzySearch(query, b.description.toLowerCase()) : 0
           )
           return bScore - aScore
         })
@@ -295,28 +367,32 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     
     // Apply category filter
     if (selectedCategory !== "All" && selectedCategory) {
-      products = products.filter(p => p.category === selectedCategory)
+      allItems = allItems.filter(item => item.category === selectedCategory)
     }
     
     // Apply additional filters
     if (filterCategory !== "All") {
-      products = products.filter(p => p.category === filterCategory)
+      allItems = allItems.filter(item => item.category === filterCategory)
     }
     
     // Apply price range filter
     if (filterMinPrice) {
-      products = products.filter(p => p.price >= parseFloat(filterMinPrice))
+      allItems = allItems.filter(item => item.price >= parseFloat(filterMinPrice))
     }
     if (filterMaxPrice) {
-      products = products.filter(p => p.price <= parseFloat(filterMaxPrice))
+      allItems = allItems.filter(item => item.price <= parseFloat(filterMaxPrice))
     }
     
-    // Apply stock filter
+    // Apply stock filter - only applies to products
     if (filterInStock) {
-      products = products.filter(p => p.stock > 0)
+      allItems = allItems.filter(item => item.type === 'service' || (item.stock && item.stock > 0))
     }
     
-    return products
+    // Sort services and products separately for better UX
+    const products = allItems.filter(item => item.type === 'product')
+    const servicesDisplay = allItems.filter(item => item.type === 'service')
+    
+    return [...products, ...servicesDisplay]
   }
 
   // Enhanced filtering with additional criteria
@@ -1325,91 +1401,91 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 </div>
               </div>
 
-              {/* Products Grid */}
+              {/* Products & Services Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {filteredProducts.map((product) => (
+                {filteredProducts.map((item) => (
                   <div
-                    key={product.id}
+                    key={item.id}
                     className="cursor-pointer group"
-                    onClick={() => addToCart(product)}
+                    onClick={() => addToCart(item)}
                   >
-                    <Card className="bg-white/80 backdrop-blur-sm border-purple-100 shadow-[0_6px_20px_rgba(139,92,246,0.1)] hover:shadow-[0_12px_30px_rgba(139,92,246,0.2)] transition-all duration-300 hover:scale-105">
+                    <Card className={`bg-white/80 backdrop-blur-sm shadow-[0_6px_20px_rgba(139,92,246,0.1)] hover:shadow-[0_12px_30px_rgba(139,92,246,0.2)] transition-all duration-300 hover:scale-105 ${
+                      item.type === 'service' ? 'border-blue-200' : 'border-purple-100'
+                    }`}>
                       <CardContent className="p-3">
                         <div className="aspect-square mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 relative">
                           <Image
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.name}
+                            src={item.image || (item.type === 'service' ? '/placeholder-service.svg' : '/placeholder.svg')}
+                            alt={item.name}
                             width={200}
                             height={200}
                             className="w-full h-full object-cover"
                           />
-                          {/* Status Badges */}
+                          {/* Type Badge */}
                           <div className="absolute top-2 left-2 flex flex-col gap-1">
-                            {product.isNew && (
+                            {item.type === 'service' && (
                               <Badge className="text-xs px-2 py-1 bg-blue-500 text-white">
-                                New
+                                Service
                               </Badge>
                             )}
-                            {product.isFeatured && (
-                              <Badge className="text-xs px-2 py-1 bg-purple-500 text-white">
-                                Featured
-                              </Badge>
-                            )}
-                            {product.discountPercentage && (
-                              <Badge className="text-xs px-2 py-1 bg-red-500 text-white">
-                                -{product.discountPercentage}%
+                            {item.type === 'product' && (
+                              <Badge className="text-xs px-2 py-1 bg-green-500 text-white">
+                                Product
                               </Badge>
                             )}
                           </div>
-                          {/* Stock Badge */}
-                          {product.stock <= 5 && product.stock > 0 && (
-                            <div className="absolute bottom-2 right-2">
-                              <Badge className="text-xs px-2 py-1 bg-amber-500 text-white animate-pulse">
-                                Low Stock
-                              </Badge>
-                            </div>
-                          )}
-                          {product.stock === 0 && (
-                            <div className="absolute bottom-2 right-2">
-                              <Badge className="text-xs px-2 py-1 bg-red-500 text-white">
-                                Out of Stock
-                              </Badge>
-                            </div>
-                          )}
+                          {/* Stock/Duration Indicator */}
+                          <div className="absolute top-2 right-2">
+                            {item.type === 'service' ? (
+                              item.duration && (
+                                <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                  {item.duration}min
+                                </div>
+                              )
+                            ) : (
+                              item.stock !== undefined && (
+                                item.stock <= 0 ? (
+                                  <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                    Out of Stock
+                                  </div>
+                                ) : item.stock <= 5 ? (
+                                  <div className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                    Low Stock ({item.stock})
+                                  </div>
+                                ) : (
+                                  <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                    {item.stock} in stock
+                                  </div>
+                                )
+                              )
+                            )}
+                          </div>
                         </div>
                         <h3 className="font-semibold text-sm mb-1 line-clamp-2 text-slate-800">
-                          {product.name}
+                          {item.name}
                         </h3>
-                        {product.brand && (
-                          <p className="text-xs text-gray-500 mb-1">{product.brand}</p>
+                        {item.description && item.type === 'service' && (
+                          <p className="text-xs text-gray-500 mb-1 line-clamp-1">{item.description}</p>
                         )}
-                        {product.sku && (
-                          <p className="text-xs text-gray-400 font-mono mb-1">SKU: {product.sku}</p>
+                        {item.unit && (
+                          <p className="text-xs text-gray-400 mb-1">Unit: {item.unit}</p>
                         )}
                         <div className="flex items-center justify-between mb-1">
                           <div>
-                            {product.discountPrice ? (
-                              <div className="flex items-center gap-2">
-                                <p className="text-purple-600 font-bold text-base">
-                                  ${product.discountPrice.toFixed(2)}
-                                </p>
-                                <p className="text-gray-400 line-through text-sm">
-                                  ${product.price.toFixed(2)}
-                                </p>
-                              </div>
-                            ) : (
-                              <p className="text-purple-600 font-bold text-base">
-                                ${product.price.toFixed(2)}
-                              </p>
-                            )}
+                            <p className={`font-bold text-base ${item.type === 'service' ? 'text-blue-600' : 'text-purple-600'}`}>
+                              ${item.price.toFixed(2)}
+                            </p>
                           </div>
                           <div className="text-xs text-gray-500">
-                            Stock: {product.stock}
+                            {item.type === 'product' && item.stock !== undefined ? (
+                              <span>Stock: {item.stock}</span>
+                            ) : item.type === 'service' && item.duration ? (
+                              <span>{item.duration} min</span>
+                            ) : (
+                              <span>{item.category}</span>
+                            )}
                           </div>
                         </div>
-                        {product.unit && (
-                          <p className="text-xs text-gray-500">Unit: {product.unit}</p>
-                        )}
                       </CardContent>
                     </Card>
                   </div>

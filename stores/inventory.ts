@@ -43,8 +43,20 @@ interface SearchHistory {
   searchCount: Record<string, number>
 }
 
+interface Service {
+  id: string
+  name: string
+  description: string
+  price: number
+  unit: string
+  category: string
+  active: boolean
+  duration?: number // in minutes
+}
+
 interface InventoryState {
   products: Product[]
+  services: Service[]
   categories: Category[]
   categoryMap: Record<string, string> // Maps category UUID to category name
   alerts: InventoryAlert[]
@@ -68,6 +80,10 @@ interface InventoryState {
   addProduct: (product: Product) => void
   updateProduct: (id: string, updates: Partial<Product>) => void
   deleteProduct: (id: string) => void
+  setServices: (services: Service[]) => void
+  addService: (service: Service) => void
+  updateService: (id: string, updates: Partial<Service>) => void
+  deleteService: (id: string) => void
   updateStock: (id: string, quantity: number, operation: 'add' | 'subtract' | 'set') => void
   setCategories: (categories: Category[]) => void
   addCategory: (category: Category) => void
@@ -345,6 +361,7 @@ export const useInventoryStore = create<InventoryState>()(
   persist(
     (set, get) => ({
       products: mockProducts,
+      services: [],
       categories: mockCategories,
       categoryMap: {},
       alerts: [],
@@ -405,6 +422,29 @@ export const useInventoryStore = create<InventoryState>()(
       deleteProduct: (id: string) => {
         const { products } = get()
         set({ products: products.filter(product => product.id !== id) })
+      },
+
+      setServices: (services: Service[]) => {
+        set({ services })
+      },
+
+      addService: (service: Service) => {
+        const { services } = get()
+        set({ services: [...services, service] })
+      },
+
+      updateService: (id: string, updates: Partial<Service>) => {
+        const { services } = get()
+        set({
+          services: services.map(service =>
+            service.id === id ? { ...service, ...updates } : service
+          )
+        })
+      },
+
+      deleteService: (id: string) => {
+        const { services } = get()
+        set({ services: services.filter(service => service.id !== id) })
       },
 
       updateStock: (id: string, quantity: number, operation: 'add' | 'subtract' | 'set') => {
@@ -587,9 +627,31 @@ export const useInventoryStore = create<InventoryState>()(
             updatedAt: new Date()
           }))
           
+          // Refresh services data
+          let services = get().services
+          try {
+            const servicesResponse = await fetch('/api/services')
+            if (servicesResponse.ok) {
+              const servicesData = await servicesResponse.json()
+              services = servicesData.data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                description: item.description || '',
+                price: item.price || 0,
+                unit: item.unit || 'service',
+                category: item.category || 'Services',
+                active: item.active !== false,
+                duration: item.duration || 60
+              }))
+            }
+          } catch (error) {
+            console.warn('Failed to refresh services data:', error)
+          }
+          
           // Update store with fresh data
           set({
             products,
+            services,
             lastRefresh: new Date()
           })
           
@@ -623,6 +685,7 @@ export const useInventoryStore = create<InventoryState>()(
           // Load categories first
           await get().loadCategories()
           
+          // Load products
           const response = await fetch('/api/inventory')
           if (!response.ok) {
             console.warn('Failed to fetch initial inventory data, using mock data')
@@ -656,6 +719,28 @@ export const useInventoryStore = create<InventoryState>()(
           }))
           
           set({ products })
+          
+          // Load services
+          try {
+            const servicesResponse = await fetch('/api/services')
+            if (servicesResponse.ok) {
+              const servicesData = await servicesResponse.json()
+              const services = servicesData.data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                description: item.description || '',
+                price: item.price || 0,
+                unit: item.unit || 'service',
+                category: item.category || 'Services',
+                active: item.active !== false,
+                duration: item.duration || 60
+              }))
+              set({ services })
+            }
+          } catch (error) {
+            console.warn('Failed to load services data:', error)
+          }
+          
           get().generateAlerts()
         } catch (error) {
           console.warn('Failed to load initial data:', error)
@@ -1248,6 +1333,7 @@ export const useInventoryStore = create<InventoryState>()(
       name: 'inventory-storage-v3', // Force fresh start after fixing main-sales-screen-simple.tsx
       partialize: (state) => ({
         products: state.products,
+        services: state.services,
         categories: state.categories,
         categoryMap: state.categoryMap,
         selectedCategory: state.selectedCategory,
