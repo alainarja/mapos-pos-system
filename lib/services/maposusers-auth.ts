@@ -50,8 +50,8 @@ class MaposUsersAuthService {
 
   constructor() {
     this.config = {
-      baseUrl: process.env.NEXT_PUBLIC_MAPOS_USERS_API_URL || '',
-      apiKey: process.env.NEXT_PUBLIC_MAPOS_USERS_API_KEY || ''
+      baseUrl: process.env.NEXT_PUBLIC_MAPOS_USERS_API_URL || 'https://marbleusers.vercel.app',
+      apiKey: process.env.NEXT_PUBLIC_MAPOS_USERS_API_KEY || 'development_mapos_users_key'
     }
 
     if (!this.config.baseUrl || !this.config.apiKey) {
