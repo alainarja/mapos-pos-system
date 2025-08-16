@@ -8,6 +8,8 @@ import { maposUsersAuth, type AuthUser } from "@/lib/services/maposusers-auth"
 
 type AuthMode = "login" | "pin" | "authenticated"
 
+// Force rebuild to update environment variables
+
 export default function HomePage() {
   const [authMode, setAuthMode] = useState<AuthMode>("login")
   const [user, setUser] = useState<AuthUser | null>(null)
