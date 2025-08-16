@@ -47,7 +47,6 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
         setTimeout(() => {
           // Pass the PIN to the parent component for authentication
           onUnlock(newPin)
-          setIsProcessing(false)
         }, 300)
       }
     }
@@ -95,6 +94,7 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     handleAuthResult: (success: boolean, error?: string) => {
+      setIsProcessing(false) // Always stop processing when we get a result
       if (success) {
         playSuccess()
         setErrorMessage(null)
@@ -191,7 +191,17 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
           {failedAttempts > 0 && !isLocked && (
             <p className="text-orange-400 text-sm mt-2">{3 - failedAttempts} attempts remaining</p>
           )}
-          {errorMessage && (
+          {isProcessing && (
+            <div className="mt-3 flex flex-col items-center">
+              <div className="flex space-x-1 mb-2">
+                <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce"></div>
+                <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                <div className="w-3 h-3 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+              </div>
+              <p className="text-purple-200/80 text-sm animate-pulse">Verifying PIN...</p>
+            </div>
+          )}
+          {errorMessage && !isProcessing && (
             <p className="text-red-400 text-sm mt-2 animate-pulse bg-red-900/20 px-3 py-1 rounded-md border border-red-400/30">
               {errorMessage}
             </p>
@@ -267,21 +277,6 @@ export const PinLock = forwardRef<PinLockRef, PinLockProps>(({
               )}
             </div>
 
-            {isProcessing && (
-              <div className="flex justify-center mt-4">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 
