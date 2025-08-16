@@ -90,6 +90,19 @@ class ExternalAPIService {
     )
   }
 
+  // Services methods
+  async getServices(params?: PaginationParams) {
+    return this.makeRequest(
+      this.inventoryConfig,
+      '/api/external/services',
+      {
+        page: params?.page?.toString() || '1',
+        perPage: params?.perPage?.toString() || '100',
+        search: params?.search || ''
+      }
+    )
+  }
+
   // Customer methods  
   async getCustomers(params?: PaginationParams) {
     return this.makeRequest(
