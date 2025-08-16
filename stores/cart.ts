@@ -10,6 +10,13 @@ interface DiscountInfo {
   timestamp: Date
 }
 
+interface SaleResult {
+  success: boolean
+  saleId?: string
+  message: string
+  errors?: any[]
+}
+
 interface CartState {
   items: CartItem[]
   selectedCustomer: Customer | null
@@ -44,6 +51,7 @@ interface CartState {
   loadSavedCart: (savedCart: SavedCart) => void
   canSaveCart: () => boolean
   createCartFromTemplate: (templateCart: SavedCart) => void
+  processSale: (paymentMethod: string, user: string, warehouseId?: string) => Promise<SaleResult>
 }
 
 export const useCartStore = create<CartState>()(
@@ -439,6 +447,108 @@ export const useCartStore = create<CartState>()(
         
         // Recalculate totals
         get().calculateTotals()
+      },
+
+      processSale: async (paymentMethod: string, user: string, warehouseId?: string): Promise<SaleResult> => {
+        const state = get()
+        
+        // Validate cart has items
+        if (state.items.length === 0) {
+          return {
+            success: false,
+            message: 'Cannot process sale: Cart is empty'
+          }
+        }
+        
+        // Validate payment method
+        if (!paymentMethod || paymentMethod.trim() === '') {
+          return {
+            success: false,
+            message: 'Payment method is required'
+          }
+        }
+        
+        // Validate user
+        if (!user || user.trim() === '') {
+          return {
+            success: false,
+            message: 'User information is required'
+          }
+        }
+        
+        try {
+          // Transform cart items to sale items format
+          const saleItems = state.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            type: (item as any).type || 'product', // Default to product if type not specified
+            stock: (item as any).stock
+          }))
+          
+          // Prepare sale transaction data
+          const saleTransaction = {
+            items: saleItems,
+            subtotal: state.subtotal,
+            tax: state.tax,
+            total: state.total,
+            paymentMethod,
+            user,
+            warehouseId,
+            customerId: state.selectedCustomer?.id,
+            appliedDiscounts: {
+              cartDiscount: state.discount,
+              discountInfo: state.discountInfo,
+              coupons: state.appliedCoupons,
+              totalSavings: state.totalSavings
+            }
+          }
+          
+          // Call sales API
+          const response = await fetch('/api/sales', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(saleTransaction)
+          })
+          
+          const result = await response.json()
+          
+          if (!response.ok) {
+            return {
+              success: false,
+              message: result.error || 'Failed to process sale',
+              errors: [result]
+            }
+          }
+          
+          if (result.success) {
+            // Clear cart on successful sale
+            get().clearCart()
+            
+            return {
+              success: true,
+              saleId: result.saleId,
+              message: result.message || 'Sale completed successfully'
+            }
+          } else {
+            return {
+              success: false,
+              message: result.message || 'Sale processing failed',
+              errors: result.errors
+            }
+          }
+          
+        } catch (error) {
+          console.error('Sale processing error:', error)
+          return {
+            success: false,
+            message: 'Network error: Failed to connect to sales system',
+            errors: [error]
+          }
+        }
       }
     }),
     {
