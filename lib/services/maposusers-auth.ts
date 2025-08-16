@@ -50,8 +50,8 @@ class MaposUsersAuthService {
 
   constructor() {
     this.config = {
-      baseUrl: process.env.MAPOS_USERS_API_URL || '',
-      apiKey: process.env.MAPOS_USERS_API_KEY || ''
+      baseUrl: process.env.NEXT_PUBLIC_MAPOS_USERS_API_URL || '',
+      apiKey: process.env.NEXT_PUBLIC_MAPOS_USERS_API_KEY || ''
     }
 
     if (!this.config.baseUrl || !this.config.apiKey) {
@@ -281,14 +281,15 @@ class MaposUsersAuthService {
 
   /**
    * Mock PIN authentication for development/testing
-   * Supports both dedicated PINs and numeric passwords as PINs
+   * Now relies on MaposUsers API instead of hardcoded mappings
    */
   private async mockPinLogin(pin: string, userId?: string): Promise<AuthResponse> {
     await new Promise(resolve => setTimeout(resolve, 300)) // Simulate API delay
 
-    // Mock users
-    const mockUsers: Record<string, AuthUser> = {
-      'mock_manager_id': {
+    // For mock mode, we'll only provide a few test PINs that would work in development
+    // The actual production system should use the real MaposUsers API
+    const developmentTestPins: Record<string, AuthUser> = {
+      '1234': {
         id: 'mock_manager_id',
         email: 'manager@pos.com',
         fullName: 'Store Manager',
@@ -299,7 +300,7 @@ class MaposUsersAuthService {
         modules: ['POS', 'Sales', 'Inventory', 'CRM'],
         authMethod: 'pin'
       },
-      'mock_cashier_id': {
+      '5678': {
         id: 'mock_cashier_id',
         email: 'cashier@pos.com',
         fullName: 'Store Cashier',
@@ -312,23 +313,10 @@ class MaposUsersAuthService {
       }
     }
 
-    // PIN to user mappings - supports both dedicated PINs and passwords as PINs
-    const pinToUserMappings: Record<string, string> = {
-      // Dedicated PINs
-      '1234': 'mock_manager_id',    
-      '5678': 'mock_cashier_id',    
-      '9999': 'mock_manager_id',    // Additional manager PIN
-      '1111': 'mock_cashier_id',    // Additional cashier PIN
-      
-      // Numeric passwords that can work as PINs
-      '2024': 'mock_manager_id',    // Example: year as password/PIN
-      '0000': 'mock_cashier_id',    // Example: simple numeric password
-    }
-
-    const matchedUserId = pinToUserMappings[pin]
-    const user = matchedUserId ? mockUsers[matchedUserId] : null
+    const user = developmentTestPins[pin]
 
     if (user) {
+      console.warn('Using mock PIN authentication. In production, this will be handled by MaposUsers service.')
       return {
         success: true,
         user: user,

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>POS Authentication Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🧪 POS Authentication Frontend Test</h1>
+    
+    <div class="info">
+        <h3>📋 Test Instructions:</h3>
+        <ol>
+            <li>Open the POS in a new tab: <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
+            <li>Click "Use PIN Instead" if available</li>
+            <li>Test the PINs below and verify the results match expectations</li>
+        </ol>
+    </div>
+    
+    <h2>❌ Invalid PINs (Should be REJECTED):</h2>
+    <div class="error">
+        <strong>PIN 0000</strong> - Should show error and stay on login screen
+    </div>
+    <div class="error">
+        <strong>PIN 1111</strong> - Should show error and stay on login screen
+    </div>
+    <div class="error">
+        <strong>PIN 9876</strong> - Should show error and stay on login screen
+    </div>
+    
+    <h2>✅ Valid PINs (Should be ACCEPTED):</h2>
+    <div class="success">
+        <strong>PIN 1234</strong> - Should login as "Store Manager" with full POS access
+    </div>
+    <div class="success">
+        <strong>PIN 5678</strong> - Should login as "Store Cashier" with basic POS access
+    </div>
+    <div class="success">
+        <strong>PIN 9999</strong> - Should login as "POS Administrator" with admin access
+    </div>
+    
+    <h2>🔧 Backend Test Results:</h2>
+    <div id="backend-results"></div>
+    
+    <script>
+        // Test backend API directly
+        async function testBackendAPI() {
+            const resultsDiv = document.getElementById('backend-results');
+            const testPins = [
+                { pin: '0000', expected: 'reject', name: 'Invalid PIN' },
+                { pin: '1234', expected: 'accept', name: 'Manager PIN' },
+                { pin: '5678', expected: 'accept', name: 'Cashier PIN' },
+                { pin: '9999', expected: 'accept', name: 'Admin PIN' }
+            ];
+            
+            for (const test of testPins) {
+                try {
+                    const response = await fetch('http://localhost:3001/api/external/pos-auth', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': 'development_mapos_users_key'
+                        },
+                        body: JSON.stringify({
+                            type: 'pin',
+                            pin: test.pin
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    const success = data.success === true;
+                    const shouldAccept = test.expected === 'accept';
+                    const correct = success === shouldAccept;
+                    
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = `test-result ${correct ? 'success' : 'error'}`;
+                    resultDiv.innerHTML = `
+                        <strong>${test.name} (${test.pin}):</strong> 
+                        ${correct ? '✅' : '❌'} 
+                        ${success ? 'ACCEPTED' : 'REJECTED'} 
+                        ${success && data.user ? `- ${data.user.fullName}` : ''}
+                    `;
+                    resultsDiv.appendChild(resultDiv);
+                    
+                } catch (error) {
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'test-result error';
+                    resultDiv.innerHTML = `<strong>${test.name} (${test.pin}):</strong> ❌ ERROR - ${error.message}`;
+                    resultsDiv.appendChild(resultDiv);
+                }
+            }
+        }
+        
+        // Run tests when page loads
+        window.onload = testBackendAPI;
+    </script>
+</body>
+</html>
