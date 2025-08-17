@@ -1473,7 +1473,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                       item.type === 'service' ? 'border-blue-200' : 'border-purple-100'
                     }`}>
                       <CardContent className="p-3">
-                        <div className="aspect-square mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 relative">
+                        <div className="aspect-square mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 relative isolate">
                           <Image
                             src={item.image || (item.type === 'service' ? '/placeholder-service.svg' : '/placeholder.svg')}
                             alt={item.name}
@@ -1482,7 +1482,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                             className="w-full h-full object-cover"
                           />
                           {/* Type Badge */}
-                          <div className="absolute top-2 left-2 flex flex-col gap-1">
+                          <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                             {item.type === 'service' && (
                               <Badge className="text-xs px-2 py-1 bg-blue-500 text-white">
                                 Service
@@ -1494,32 +1494,14 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                               </Badge>
                             )}
                           </div>
-                          {/* Stock/Duration Indicator */}
-                          <div className="absolute top-2 right-2">
-                            {item.type === 'service' ? (
-                              item.duration && (
-                                <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                                  {item.duration}min
-                                </div>
-                              )
-                            ) : (
-                              item.stock !== undefined && (
-                                item.stock <= 0 ? (
-                                  <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                                    Out of Stock
-                                  </div>
-                                ) : item.stock <= 5 ? (
-                                  <div className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                                    Low Stock ({item.stock})
-                                  </div>
-                                ) : (
-                                  <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                                    {item.stock} in stock
-                                  </div>
-                                )
-                              )
-                            )}
-                          </div>
+                          {/* Duration Indicator for Services only */}
+                          {item.type === 'service' && item.duration && (
+                            <div className="absolute top-2 right-2 z-10">
+                              <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                {item.duration}min
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <h3 className="font-semibold text-sm mb-1 line-clamp-2 text-slate-800">
                           {item.name}
