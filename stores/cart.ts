@@ -559,7 +559,13 @@ export const useCartStore = create<CartState>()(
         discount: state.discount,
         discountInfo: state.discountInfo,
         appliedCoupons: state.appliedCoupons
-      })
+      }),
+      onRehydrateStorage: () => (state) => {
+        // Recalculate totals when store is hydrated from localStorage
+        if (state) {
+          state.calculateTotals()
+        }
+      }
     }
   )
 )
