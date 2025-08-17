@@ -103,6 +103,27 @@ class ExternalAPIService {
     )
   }
 
+  // Inventory update methods
+  async updateInventoryQuantity(sku: string, quantity: number, operation: string = 'set') {
+    const response = await fetch(`${this.inventoryConfig.baseUrl}/api/external/inventory/${sku}/quantity`, {
+      method: 'PATCH',
+      headers: {
+        'x-api-key': this.inventoryConfig.apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        quantity,
+        operation
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Inventory update failed: ${response.status} ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
   // Customer methods  
   async getCustomers(params?: PaginationParams) {
     return this.makeRequest(
