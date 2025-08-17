@@ -639,11 +639,18 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   }
 
   const completeSale = async (paymentMethod: string) => {
+    console.log('🔄 completeSale called with payment method:', paymentMethod)
+    console.log('🔄 isTrainingMode:', isTrainingMode)
+    console.log('🔄 isAuthenticated:', isAuthenticated)
+    console.log('🔄 currentUser:', currentUser)
+    console.log('🔄 cart.length:', cart.length)
+    
     // Play success sound
     playSuccess()
     
+    // TEMPORARILY DISABLE training mode check to fix the issue
     // In training mode, show different behavior
-    if (isTrainingMode) {
+    if (false) { // Disabled: isTrainingMode
       // Show training mode success notification
       setTimeout(() => {
         addNotification({
