@@ -45,6 +45,7 @@ import Link from "next/link"
 import { useCartStore } from "@/stores/cart"
 import { useInventoryStore } from "@/stores/inventory"
 import { useNotificationStore } from "@/stores/notifications"
+import { useUserStore } from "@/stores/user"
 import { CouponInput } from "@/components/pos/coupon-input"
 import { ReturnsExchange } from "@/components/pos/returns-exchange"
 import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration"
@@ -116,9 +117,12 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     clearCart,
     applyCoupon,
     removeCoupon,
+    processSale,
   } = useCartStore()
   
   const { unreadCount, addNotification } = useNotificationStore()
+  
+  const { currentUser, isAuthenticated } = useUserStore()
   
   const {
     products: mockProducts,
@@ -173,6 +177,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [managerPasswordForPrice, setManagerPasswordForPrice] = useState('')
   const [showCustomerDisplay, setShowCustomerDisplay] = useState(false)
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+  const [selectedWarehouse, setSelectedWarehouse] = useState<{id: string, name: string} | null>(null)
+  const [warehouses, setWarehouses] = useState<{id: string, name: string, address?: string}[]>([])
+  const [showWarehouseDialog, setShowWarehouseDialog] = useState(false)
   const [searchMode, setSearchMode] = useState<'name' | 'barcode' | 'sku' | 'all'>('all')
   const [fuzzySearchEnabled, setFuzzySearchEnabled] = useState(true)
   const [showOpenDrawer, setShowOpenDrawer] = useState(false)
@@ -451,6 +458,26 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     loadInventoryData()
   }, [refreshInventory])
 
+  // Load warehouses on component mount
+  useEffect(() => {
+    const loadWarehouses = async () => {
+      try {
+        const response = await fetch('/api/warehouses')
+        if (response.ok) {
+          const data = await response.json()
+          setWarehouses(data || [])
+          // Auto-select first warehouse if available
+          if (data && data.length > 0 && !selectedWarehouse) {
+            setSelectedWarehouse({ id: data[0].id, name: data[0].name })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load warehouses:', error)
+      }
+    }
+    loadWarehouses()
+  }, [])
+
   // Debug logging to see what data is available
   useEffect(() => {
     console.log('🎯 Component state:', {
@@ -655,45 +682,124 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       }, 500)
       return
     }
-    
-    // Create transaction record
-    const transaction = {
-      id: Date.now().toString(),
-      timestamp: new Date(),
-      items: cart,
-      subtotal,
-      discount: totalSavings,
-      tax,
-      total,
-      paymentMethod,
-      referral: appliedReferral,
-      coupons: appliedCoupons
-    }
-    
-    // Save transaction
-    setLastTransaction(transaction)
-    setTransactionHistory(prev => [transaction, ...prev])
-    
-    // Print receipt
-    printReceipt(transaction)
-    
-    // Show success feedback
-    setTimeout(() => {
+
+    // Validate cart has items
+    if (cart.length === 0) {
       addNotification({
         id: Date.now().toString(),
-        type: 'success',
-        title: 'Payment Successful',
-        message: `Payment of $${total.toFixed(2)} completed with ${paymentMethod}`,
+        type: 'error',
+        title: 'Sale Failed',
+        message: 'Cannot process sale: Cart is empty',
         timestamp: new Date(),
         isRead: false
       })
+      return
+    }
+
+    // Validate user authentication
+    if (!isAuthenticated || !currentUser) {
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        title: 'Authentication Required',
+        message: 'Please log in to complete the sale',
+        timestamp: new Date(),
+        isRead: false
+      })
+      return
+    }
+
+    try {
+      // Show processing notification
+      addNotification({
+        id: Date.now().toString(),
+        type: 'info',
+        title: 'Processing Sale',
+        message: `Processing payment of $${total.toFixed(2)}...`,
+        timestamp: new Date(),
+        isRead: false
+      })
+
+      // Process sale through API with inventory updates
+      const result = await processSale(
+        paymentMethod, 
+        currentUser.username || currentUser.id,
+        selectedWarehouse?.id // warehouseId for inventory tracking
+      )
+
+      if (result.success) {
+        // Create local transaction record for UI
+        const transaction = {
+          id: result.saleId || Date.now().toString(),
+          timestamp: new Date(),
+          items: cart,
+          subtotal,
+          discount: totalSavings,
+          tax,
+          total,
+          paymentMethod,
+          referral: appliedReferral,
+          coupons: appliedCoupons
+        }
+        
+        // Save transaction locally
+        setLastTransaction(transaction)
+        setTransactionHistory(prev => [transaction, ...prev])
+        
+        // Print receipt
+        printReceipt(transaction)
+        
+        // Refresh inventory to show updated stock levels
+        await refreshInventory()
+        
+        // Show success notification
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          title: 'Payment Successful',
+          message: result.message || `Payment of $${total.toFixed(2)} completed with ${paymentMethod}`,
+          timestamp: new Date(),
+          isRead: false
+        })
+        
+        // Reset everything after success
+        setShowPaymentDialog(false)
+        setReferralCode('')
+        setAppliedReferral(null)
+        setShowCashCalculator(false)
+        setAmountTendered('')
+        // Note: clearCart() is called in processSale on success
+        
+      } else {
+        // Sale failed - show error but keep cart intact for retry
+        addNotification({
+          id: Date.now().toString(),
+          type: 'error',
+          title: 'Sale Failed',
+          message: result.message || 'Failed to process sale. Please try again.',
+          timestamp: new Date(),
+          isRead: false
+        })
+        
+        // Log errors for debugging
+        if (result.errors) {
+          console.error('Sale processing errors:', result.errors)
+        }
+      }
       
-      // Reset everything
-      clearCart()
-      setShowPaymentDialog(false)
-      setReferralCode('')
-      setAppliedReferral(null)
-    }, 500)
+    } catch (error) {
+      console.error('Sale processing error:', error)
+      
+      // Network or system error - show error but keep cart intact
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        title: 'Connection Error',
+        message: 'Unable to connect to payment system. Please check your connection and try again.',
+        timestamp: new Date(),
+        isRead: false
+      })
+    }
   }
 
   // Void/Cancel functionality
@@ -1193,8 +1299,25 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
             </div>
           </div>
 
-          {/* Right - User Info Only */}
+          {/* Right - Warehouse & User Info */}
           <div className="flex items-center gap-3">
+            {/* Warehouse Selection */}
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/50 backdrop-blur-sm border border-purple-200/40">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-sm font-medium text-purple-900">
+                {selectedWarehouse ? selectedWarehouse.name : 'No Location'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowWarehouseDialog(true)}
+                className="h-6 w-6 p-0 hover:bg-purple-100"
+                title="Change warehouse location"
+              >
+                <Settings className="h-3 w-3" />
+              </Button>
+            </div>
+
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/50 backdrop-blur-sm border border-purple-200/40">
               <User className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-semibold text-purple-900">{user}</span>
@@ -2893,6 +3016,81 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg"
               >
                 Apply Settings
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warehouse Selection Dialog */}
+      {showWarehouseDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+                  <div className="w-3 h-3 rounded-full bg-white"></div>
+                </div>
+                <h2 className="text-xl font-bold text-gray-800">Select Warehouse</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowWarehouseDialog(false)}
+                className="hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              {warehouses.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                    <AlertTriangle className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <p>No warehouses available</p>
+                  <p className="text-sm">Contact administrator to set up locations</p>
+                </div>
+              ) : (
+                warehouses.map((warehouse) => (
+                  <div
+                    key={warehouse.id}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                      selectedWarehouse?.id === warehouse.id
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
+                    }`}
+                    onClick={() => {
+                      setSelectedWarehouse({ id: warehouse.id, name: warehouse.name })
+                      setShowWarehouseDialog(false)
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{warehouse.name}</h3>
+                        {warehouse.address && (
+                          <p className="text-sm text-gray-500">{warehouse.address}</p>
+                        )}
+                      </div>
+                      {selectedWarehouse?.id === warehouse.id && (
+                        <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
+                          <Check className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowWarehouseDialog(false)}
+                className="flex-1"
+              >
+                Cancel
               </Button>
             </div>
           </div>
