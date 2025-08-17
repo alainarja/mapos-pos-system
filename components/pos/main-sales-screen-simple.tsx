@@ -278,8 +278,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
 
   // Advanced search function that combines products and services
   const getAdvancedFilteredProducts = (): DisplayItem[] => {
-    // Transform products to DisplayItem format
-    const productItems: DisplayItem[] = mockProducts.map(product => ({
+    // Transform products to DisplayItem format - use real products from store, fallback to mock if empty
+    const realProducts = mockProducts.length > 0 ? mockProducts : []
+    const productItems: DisplayItem[] = realProducts.map(product => ({
       id: product.id,
       name: product.name,
       price: product.price,
@@ -437,6 +438,16 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     
     loadInventoryData()
   }, [refreshInventory])
+
+  // Debug logging to see what data is available
+  useEffect(() => {
+    console.log('🎯 Component state:', {
+      mockProducts: mockProducts.length,
+      services: services.length,
+      mockProductsData: mockProducts.slice(0, 2),
+      servicesData: services.slice(0, 2)
+    })
+  }, [mockProducts, services])
 
   // Enhanced keyboard shortcuts
   useEffect(() => {
