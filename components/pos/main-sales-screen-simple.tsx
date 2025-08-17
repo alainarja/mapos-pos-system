@@ -307,7 +307,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       }))
     
     // Combine products and services
+    console.log('🔍 Combining items:', { productItems: productItems.length, serviceItems: serviceItems.length })
     let allItems = [...productItems, ...serviceItems]
+    console.log('🔍 Total combined items:', allItems.length)
     const query = searchTerm.toLowerCase().trim()
     
     if (query) {
@@ -394,6 +396,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     const products = allItems.filter(item => item.type === 'product')
     const servicesDisplay = allItems.filter(item => item.type === 'service')
     
+    console.log('🎯 Final display items:', { products: products.length, servicesDisplay: servicesDisplay.length })
     return [...products, ...servicesDisplay]
   }
 
