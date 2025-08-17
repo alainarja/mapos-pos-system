@@ -1472,7 +1472,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                     <Card className={`bg-white/80 backdrop-blur-sm shadow-[0_6px_20px_rgba(139,92,246,0.1)] hover:shadow-[0_12px_30px_rgba(139,92,246,0.2)] transition-all duration-300 hover:scale-105 ${
                       item.type === 'service' ? 'border-blue-200' : 'border-purple-100'
                     }`}>
-                      <CardContent className="p-3">
+                      <CardContent className="p-2">
                         <div className="aspect-square mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 relative isolate">
                           <Image
                             src={item.image || (item.type === 'service' ? '/placeholder-service.svg' : '/placeholder.svg')}
@@ -1525,9 +1525,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                                 item.stock <= 5 ? 'text-orange-600' : 
                                 'text-green-600'
                               }`}>
-                                Stock: {item.stock}
-                                {item.stock <= 0 && ' (Out of Stock)'}
-                                {item.stock > 0 && item.stock <= 5 && ' (Low Stock)'}
+                                {item.stock <= 0 ? 'Out of Stock' : 
+                                 item.stock <= 5 ? `${item.stock} left` : 
+                                 `${item.stock} in stock`}
                               </span>
                             ) : item.type === 'service' && item.duration ? (
                               <span className="text-blue-600">{item.duration} min</span>
