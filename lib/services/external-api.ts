@@ -105,6 +105,10 @@ class ExternalAPIService {
 
   // Inventory update methods
   async updateInventoryQuantity(sku: string, quantity: number, operation: string = 'set') {
+    // NOTE: The external inventory API at inventorymarble.vercel.app is READ-ONLY
+    // It returns 405 Method Not Allowed for all update operations
+    // This is expected behavior for a product catalog service
+    
     const response = await fetch(`${this.inventoryConfig.baseUrl}/api/external/inventory/${sku}/quantity`, {
       method: 'PATCH',
       headers: {
@@ -118,6 +122,10 @@ class ExternalAPIService {
     })
 
     if (!response.ok) {
+      // Handle expected 405 Method Not Allowed gracefully
+      if (response.status === 405) {
+        throw new Error(`External inventory API is read-only (product catalog only) - inventory updates not supported`)
+      }
       throw new Error(`Inventory update failed: ${response.status} ${response.statusText}`)
     }
 

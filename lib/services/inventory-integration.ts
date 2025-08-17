@@ -237,7 +237,9 @@ class InventoryIntegrationService {
         if (error instanceof Error && (
           error.message.includes('timeout') || 
           error.message.includes('not configured') ||
-          error.message.includes('Connection failed')
+          error.message.includes('Connection failed') ||
+          error.message.includes('read-only') ||
+          error.message.includes('Method Not Allowed')
         )) {
           inventoryServiceAvailable = false
         }
