@@ -130,6 +130,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     setSearchTerm,
     getFilteredProducts,
     getProductByBarcode,
+    refreshInventory,
   } = useInventoryStore()
   
   const [showCategorySelection, setShowCategorySelection] = useState(true)
@@ -422,6 +423,20 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       setQuickKeyProducts(popularProducts)
     }
   }, [mockProducts])
+
+  // Load inventory and services data on component mount
+  useEffect(() => {
+    const loadInventoryData = async () => {
+      try {
+        await refreshInventory()
+        console.log('Inventory and services loaded successfully')
+      } catch (error) {
+        console.error('Failed to load inventory data:', error)
+      }
+    }
+    
+    loadInventoryData()
+  }, [refreshInventory])
 
   // Enhanced keyboard shortcuts
   useEffect(() => {
