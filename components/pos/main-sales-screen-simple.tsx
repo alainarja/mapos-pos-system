@@ -177,9 +177,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [managerPasswordForPrice, setManagerPasswordForPrice] = useState('')
   const [showCustomerDisplay, setShowCustomerDisplay] = useState(false)
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
-  const [selectedWarehouse, setSelectedWarehouse] = useState<{id: string, name: string} | null>(null)
-  const [warehouses, setWarehouses] = useState<{id: string, name: string, address?: string}[]>([])
-  const [showWarehouseDialog, setShowWarehouseDialog] = useState(false)
   const [searchMode, setSearchMode] = useState<'name' | 'barcode' | 'sku' | 'all'>('all')
   const [fuzzySearchEnabled, setFuzzySearchEnabled] = useState(true)
   const [showOpenDrawer, setShowOpenDrawer] = useState(false)
@@ -458,25 +455,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     loadInventoryData()
   }, [refreshInventory])
 
-  // Load warehouses on component mount
-  useEffect(() => {
-    const loadWarehouses = async () => {
-      try {
-        const response = await fetch('/api/warehouses')
-        if (response.ok) {
-          const data = await response.json()
-          setWarehouses(data || [])
-          // Auto-select first warehouse if available
-          if (data && data.length > 0 && !selectedWarehouse) {
-            setSelectedWarehouse({ id: data[0].id, name: data[0].name })
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load warehouses:', error)
-      }
-    }
-    loadWarehouses()
-  }, [])
 
   // Debug logging to see what data is available
   useEffect(() => {
@@ -724,7 +702,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       const result = await processSale(
         paymentMethod, 
         currentUser.username || currentUser.id,
-        selectedWarehouse?.id // warehouseId for inventory tracking
+        undefined // Backend resolves warehouse from user
       )
 
       if (result.success) {
@@ -1299,25 +1277,8 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
             </div>
           </div>
 
-          {/* Right - Warehouse & User Info */}
+          {/* Right - User Info */}
           <div className="flex items-center gap-3">
-            {/* Warehouse Selection */}
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/50 backdrop-blur-sm border border-purple-200/40">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-sm font-medium text-purple-900">
-                {selectedWarehouse ? selectedWarehouse.name : 'No Location'}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowWarehouseDialog(true)}
-                className="h-6 w-6 p-0 hover:bg-purple-100"
-                title="Change warehouse location"
-              >
-                <Settings className="h-3 w-3" />
-              </Button>
-            </div>
-
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/50 backdrop-blur-sm border border-purple-200/40">
               <User className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-semibold text-purple-900">{user}</span>
@@ -3016,81 +2977,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg"
               >
                 Apply Settings
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Warehouse Selection Dialog */}
-      {showWarehouseDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
-                  <div className="w-3 h-3 rounded-full bg-white"></div>
-                </div>
-                <h2 className="text-xl font-bold text-gray-800">Select Warehouse</h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowWarehouseDialog(false)}
-                className="hover:bg-gray-100"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              {warehouses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                    <AlertTriangle className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <p>No warehouses available</p>
-                  <p className="text-sm">Contact administrator to set up locations</p>
-                </div>
-              ) : (
-                warehouses.map((warehouse) => (
-                  <div
-                    key={warehouse.id}
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                      selectedWarehouse?.id === warehouse.id
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
-                    }`}
-                    onClick={() => {
-                      setSelectedWarehouse({ id: warehouse.id, name: warehouse.name })
-                      setShowWarehouseDialog(false)
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{warehouse.name}</h3>
-                        {warehouse.address && (
-                          <p className="text-sm text-gray-500">{warehouse.address}</p>
-                        )}
-                      </div>
-                      {selectedWarehouse?.id === warehouse.id && (
-                        <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
-                          <Check className="h-4 w-4 text-white" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowWarehouseDialog(false)}
-                className="flex-1"
-              >
-                Cancel
               </Button>
             </div>
           </div>
