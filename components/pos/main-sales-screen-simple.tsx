@@ -1518,13 +1518,21 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                               ${item.price.toFixed(2)}
                             </p>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs">
                             {item.type === 'product' && item.stock !== undefined ? (
-                              <span>Stock: {item.stock}</span>
+                              <span className={`font-medium ${
+                                item.stock <= 0 ? 'text-red-600' : 
+                                item.stock <= 5 ? 'text-orange-600' : 
+                                'text-green-600'
+                              }`}>
+                                Stock: {item.stock}
+                                {item.stock <= 0 && ' (Out of Stock)'}
+                                {item.stock > 0 && item.stock <= 5 && ' (Low Stock)'}
+                              </span>
                             ) : item.type === 'service' && item.duration ? (
-                              <span>{item.duration} min</span>
+                              <span className="text-blue-600">{item.duration} min</span>
                             ) : (
-                              <span>{item.category}</span>
+                              <span className="text-gray-500">{item.category}</span>
                             )}
                           </div>
                         </div>
