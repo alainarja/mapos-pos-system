@@ -371,12 +371,21 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     
     // Apply category filter
     if (selectedCategory !== "All" && selectedCategory) {
-      allItems = allItems.filter(item => item.category === selectedCategory)
+      if (selectedCategory === "Services") {
+        // Special category to show only services
+        allItems = allItems.filter(item => item.type === 'service')
+      } else {
+        allItems = allItems.filter(item => item.category === selectedCategory)
+      }
     }
     
     // Apply additional filters
     if (filterCategory !== "All") {
-      allItems = allItems.filter(item => item.category === filterCategory)
+      if (filterCategory === "Services") {
+        allItems = allItems.filter(item => item.type === 'service')
+      } else {
+        allItems = allItems.filter(item => item.category === filterCategory)
+      }
     }
     
     // Apply price range filter
@@ -1343,6 +1352,28 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
 
               {/* Categories Grid */}
               <div className="grid grid-cols-3 gap-4 mb-8">
+                {/* Add Services category as first item */}
+                <div
+                  key="services"
+                  className="cursor-pointer group"
+                  onClick={() => {
+                    setSelectedCategory("Services")
+                    setShowCategorySelection(false)
+                  }}
+                >
+                  <Card className="bg-white/80 backdrop-blur-sm border-blue-100 shadow-[0_8px_30px_rgba(59,130,246,0.1)] hover:shadow-[0_15px_40px_rgba(59,130,246,0.2)] transition-shadow duration-300">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-3xl mb-2">
+                        🔧
+                      </div>
+                      <h3 className="text-lg font-semibold mb-1 text-slate-800">Services</h3>
+                      <p className="text-blue-600 text-sm font-medium">
+                        {services.length} items
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+                
                 {categories.map((category, index) => (
                   <div
                     key={category.name}
@@ -2278,6 +2309,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="All">All Categories</option>
+                  <option value="Services">Services</option>
                   {categories.map(cat => (
                     <option key={typeof cat === 'string' ? cat : cat.name} value={typeof cat === 'string' ? cat : cat.name}>
                       {typeof cat === 'string' ? cat : cat.name}
