@@ -169,6 +169,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [voidReason, setVoidReason] = useState('')
   const [isTrainingMode, setIsTrainingMode] = useState(false)
   const [showTrainingDialog, setShowTrainingDialog] = useState(false)
+
+  // Ensure training mode is disabled on component mount
+  useEffect(() => {
+    setIsTrainingMode(false)
+  }, [])
   const [showPriceOverride, setShowPriceOverride] = useState(false)
   const [priceOverrideItemId, setPriceOverrideItemId] = useState<string | null>(null)
   const [overridePrice, setOverridePrice] = useState('')
@@ -1964,10 +1969,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                       Back
                     </Button>
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         if (parseFloat(amountTendered) >= total) {
-                          completeSale("Cash")
+                          await completeSale("Cash")
                           setShowCashCalculator(false)
+                          setShowPaymentDialog(false)
                           setAmountTendered("")
                         } else {
                           playError()
@@ -1991,21 +1997,30 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                   💵 Cash
                 </SoundButton>
                 <SoundButton
-                  onClick={() => completeSale("Card")}
+                  onClick={async () => {
+                    await completeSale("Card")
+                    setShowPaymentDialog(false)
+                  }}
                   variant="default"
                   className="h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold hover:scale-105 transition-all duration-300"
                 >
                   💳 Card
                 </SoundButton>
                 <SoundButton
-                  onClick={() => completeSale("Digital Wallet")}
+                  onClick={async () => {
+                    await completeSale("Digital Wallet")
+                    setShowPaymentDialog(false)
+                  }}
                   variant="default"
                   className="h-14 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold hover:scale-105 transition-all duration-300"
                 >
                   📱 Digital
                 </SoundButton>
                 <SoundButton
-                  onClick={() => completeSale("Gift Card")}
+                  onClick={async () => {
+                    await completeSale("Gift Card")
+                    setShowPaymentDialog(false)
+                  }}
                   variant="default"
                   className="h-14 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold hover:scale-105 transition-all duration-300"
                 >
