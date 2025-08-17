@@ -594,9 +594,12 @@ export const useInventoryStore = create<InventoryState>()(
         
         try {
           setRefreshing(true)
+          console.log('🔄 Starting inventory refresh...')
           
           // Fetch data from real API
+          console.log('📦 Fetching inventory data from /api/inventory...')
           const response = await fetch('/api/inventory')
+          console.log('📦 Inventory response status:', response.status)
           if (!response.ok) {
             throw new Error('Failed to fetch inventory data')
           }
@@ -627,12 +630,17 @@ export const useInventoryStore = create<InventoryState>()(
             updatedAt: new Date()
           }))
           
+          console.log('📦 Found', apiData.data?.length || 0, 'products')
+          
           // Refresh services data
           let services = get().services
           try {
+            console.log('🔧 Fetching services data from /api/services...')
             const servicesResponse = await fetch('/api/services')
+            console.log('🔧 Services response status:', servicesResponse.status)
             if (servicesResponse.ok) {
               const servicesData = await servicesResponse.json()
+              console.log('🔧 Found', servicesData.data?.length || 0, 'services')
               services = servicesData.data.map((item: any) => ({
                 id: item.id,
                 name: item.name,
@@ -649,6 +657,7 @@ export const useInventoryStore = create<InventoryState>()(
           }
           
           // Update store with fresh data
+          console.log('💾 Updating store with', products.length, 'products and', services.length, 'services')
           set({
             products,
             services,
@@ -659,6 +668,7 @@ export const useInventoryStore = create<InventoryState>()(
           get().generateAlerts()
           
           setRefreshing(false)
+          console.log('✅ Inventory refresh completed successfully')
           return { success: true, message: 'Inventory refreshed successfully' }
           
         } catch (error) {
