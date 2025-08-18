@@ -136,12 +136,29 @@ class RefundIntegrationService {
         perPage: 50     // Reasonable limit
       }
       
-      if (params.customerId) {
-        searchOptions.customer = params.customerId
+      // Only add search parameters if they look valid
+      if (params.customerId && params.customerId.length > 0) {
+        // Check if customerId looks like a UUID or valid ID format
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.customerId) || 
+            /^[a-zA-Z0-9_-]+$/.test(params.customerId)) {
+          searchOptions.customer = params.customerId
+        }
       }
       
-      if (params.customerName) {
-        searchOptions.search = params.customerName
+      if (params.customerName && params.customerName.length > 0) {
+        // Sanitize customer name to prevent SQL injection
+        const sanitizedName = params.customerName.replace(/['"\\;]/g, '')
+        if (sanitizedName.length > 0) {
+          searchOptions.search = sanitizedName
+        }
+      }
+
+      if (params.invoiceNumber && params.invoiceNumber.length > 0) {
+        // Add invoice number search
+        const sanitizedInvoiceNumber = params.invoiceNumber.replace(/['"\\;]/g, '')
+        if (sanitizedInvoiceNumber.length > 0) {
+          searchOptions.invoice_number = sanitizedInvoiceNumber
+        }
       }
 
       // Use the new searchInvoices method
@@ -170,20 +187,25 @@ class RefundIntegrationService {
     const createdAt = new Date(invoice.created_at || invoice.date)
     const time = createdAt.toLocaleTimeString('en-US', { hour12: false })
 
+    // Safely parse amounts with fallbacks
+    const amount = parseFloat(invoice.amount) || parseFloat(invoice.total) || 0
+    const tax = parseFloat(invoice.tax) || 0
+    const discount = parseFloat(invoice.discount) || 0
+
     return {
       id: `CRM-${invoice.id}`, // Prefix to distinguish from local transactions
-      invoiceNumber: invoice.number,
-      date: invoice.date,
+      invoiceNumber: invoice.number || invoice.invoice_number,
+      date: invoice.date || invoice.invoice_date || new Date().toISOString().split('T')[0],
       time: time,
-      total: parseFloat(invoice.amount),
-      subtotal: parseFloat(invoice.amount) - (parseFloat(invoice.tax) || 0),
-      tax: parseFloat(invoice.tax) || 0,
-      discount: parseFloat(invoice.discount) || 0,
+      total: amount,
+      subtotal: Math.max(0, amount - tax),
+      tax: tax,
+      discount: discount,
       items: (invoice.line_items || []).map((item: any) => ({
-        id: item.sku || `item-${Math.random()}`,
-        name: item.description || item.name,
-        price: parseFloat(item.price),
-        quantity: parseInt(item.quantity),
+        id: item.sku || item.id || `item-${Math.random()}`,
+        name: item.description || item.name || 'Unknown Item',
+        price: parseFloat(item.price) || parseFloat(item.unit_price) || 0,
+        quantity: parseInt(item.quantity) || 1,
         image: undefined // CRM doesn't store images
       })),
       paymentMethod: this.determineCRMPaymentMethod(invoice),

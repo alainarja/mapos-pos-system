@@ -7,6 +7,7 @@ interface SettingsState {
   
   // Actions
   updateStoreSettings: (updates: Partial<Settings['store']>) => void
+  updateCurrencySettings: (updates: Partial<Settings['currency']>) => void
   updateReceiptSettings: (updates: Partial<Settings['receipt']>) => void
   updatePaymentSettings: (updates: Partial<Settings['payment']>) => void
   updateInventorySettings: (updates: Partial<Settings['inventory']>) => void
@@ -33,6 +34,15 @@ const defaultSettings: Settings = {
     taxRate: 0.08,
     currency: "USD",
     timezone: "America/New_York"
+  },
+  currency: {
+    primaryCurrency: 'USD',
+    secondaryCurrency: 'LBP',
+    exchangeRate: 89500,
+    autoUpdateRate: false,
+    showBothCurrencies: true,
+    acceptUsdCash: true,
+    acceptLbpCash: true
   },
   receipt: {
     header: "Thank you for your purchase!",
@@ -90,6 +100,16 @@ export const useSettingsStore = create<SettingsState>()(
           settings: {
             ...settings,
             store: { ...settings.store, ...updates }
+          }
+        })
+      },
+
+      updateCurrencySettings: (updates: Partial<Settings['currency']>) => {
+        const { settings } = get()
+        set({
+          settings: {
+            ...settings,
+            currency: { ...settings.currency, ...updates }
           }
         })
       },

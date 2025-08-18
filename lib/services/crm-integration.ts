@@ -4,6 +4,7 @@ interface CrmInvoice {
   customer_id: string
   customer: string
   amount: number
+  paid_amount?: number // Add paid_amount field
   currency?: string
   line_items?: Array<{
     description: string
@@ -12,6 +13,7 @@ interface CrmInvoice {
     total: number
     sku?: string
     type?: 'product' | 'service'
+    cost_price?: number // Cost price for reporting
   }>
   status?: 'paid'
   date?: string
@@ -122,6 +124,7 @@ class CrmIntegrationService {
       total: number
       type: 'product' | 'service'
       sku?: string
+      costPrice?: number // Cost price for reporting
     }>,
     paymentMethod: string,
     currency: string = 'USD'
@@ -150,6 +153,7 @@ class CrmIntegrationService {
         customer_id: customerId,
         customer: customerName,
         amount: totalAmount,
+        paid_amount: totalAmount, // For POS sales, paid amount equals total amount
         currency,
         status: 'paid', // POS sales are immediately paid
         date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
@@ -162,7 +166,8 @@ class CrmIntegrationService {
           price: item.price,
           total: item.total,
           sku: item.sku,
-          type: item.type
+          type: item.type,
+          cost_price: item.costPrice || 0 // Include cost price for reporting
         }))
       }
 

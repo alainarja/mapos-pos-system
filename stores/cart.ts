@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { CartItem, Product, Customer, HeldCart, AppliedCoupon, SavedCart, CartSaveOptions } from '@/types'
+import { storeIdentificationService, StoreLocation } from '@/lib/services/store-identification-service'
 
 interface DiscountInfo {
   type: 'percentage' | 'fixed'
@@ -28,6 +29,7 @@ interface CartState {
   tax: number
   total: number
   totalSavings: number
+  currentStore: StoreLocation | null
   
   // Actions
   addItem: (product: Product, quantity?: number) => void
@@ -52,6 +54,9 @@ interface CartState {
   canSaveCart: () => boolean
   createCartFromTemplate: (templateCart: SavedCart) => void
   processSale: (paymentMethod: string, user: string, warehouseId?: string) => Promise<SaleResult>
+  initializeStore: () => Promise<void>
+  setCurrentStore: (storeId: string) => Promise<void>
+  refreshStore: () => Promise<void>
 }
 
 export const useCartStore = create<CartState>()(
@@ -67,6 +72,7 @@ export const useCartStore = create<CartState>()(
       tax: 0,
       total: 0,
       totalSavings: 0,
+      currentStore: null,
 
       addItem: (product: Product, quantity = 1) => {
         const { items, calculateTotals } = get()
@@ -89,7 +95,8 @@ export const useCartStore = create<CartState>()(
             image: product.image,
             category: product.category,
             discount: 0,
-            taxRate: 0.08 // 8% tax rate
+            taxRate: product.taxExempt ? 0 : (product.taxRate || 0.08), // Use product tax rate or default 8%
+            cost: product.cost || 0 // Capture cost price for reporting
           }
           set({ items: [...items, newItem] })
         }
@@ -255,7 +262,9 @@ export const useCartStore = create<CartState>()(
         let itemSavings = 0
         
         items.forEach(item => {
-          const itemTotal = item.price * item.quantity
+          const itemPrice = item.price || 0
+          const itemQuantity = item.quantity || 0
+          const itemTotal = itemPrice * itemQuantity
           originalSubtotal += itemTotal
           
           if (item.discount && item.discount > 0) {
@@ -292,13 +301,45 @@ export const useCartStore = create<CartState>()(
         })
         
         const finalSubtotal = Math.max(0, subtotalAfterItemDiscounts - cartDiscountAmount - couponDiscountAmount)
-        const tax = finalSubtotal * 0.08 // 8% tax
-        const total = finalSubtotal + tax
+        
+        // Calculate tax based on individual item tax rates
+        let totalTax = 0
+        const discountRatio = finalSubtotal > 0 ? finalSubtotal / subtotalAfterItemDiscounts : 0
+        
+        items.forEach(item => {
+          const itemPrice = item.price || 0
+          const itemQuantity = item.quantity || 0
+          const itemTotal = itemPrice * itemQuantity
+          let itemAfterDiscount = itemTotal
+          
+          // Apply item-level discount
+          if (item.discount && item.discount > 0) {
+            const discountType = (item as any).discountType || 'percentage'
+            let itemDiscountAmount = 0
+            
+            if (discountType === 'percentage') {
+              itemDiscountAmount = itemTotal * (item.discount / 100)
+            } else {
+              itemDiscountAmount = Math.min(item.discount, itemTotal)
+            }
+            
+            itemAfterDiscount = itemTotal - itemDiscountAmount
+          }
+          
+          // Apply proportional cart and coupon discounts to this item
+          const itemAfterAllDiscounts = itemAfterDiscount * discountRatio
+          
+          // Calculate tax for this item based on its tax rate
+          const itemTaxRate = item.taxRate || 0
+          totalTax += itemAfterAllDiscounts * itemTaxRate
+        })
+        
+        const total = finalSubtotal + totalTax
         const totalSavings = itemSavings + cartDiscountAmount + couponDiscountAmount
         
         set({ 
           subtotal: originalSubtotal, 
-          tax, 
+          tax: totalTax, 
           total,
           totalSavings
         })
@@ -449,6 +490,35 @@ export const useCartStore = create<CartState>()(
         get().calculateTotals()
       },
 
+      initializeStore: async () => {
+        try {
+          const currentStore = await storeIdentificationService.getCurrentStore()
+          set({ currentStore })
+        } catch (error) {
+          console.error('Failed to initialize store:', error)
+        }
+      },
+
+      setCurrentStore: async (storeId: string) => {
+        try {
+          const store = await storeIdentificationService.setCurrentStore(storeId)
+          set({ currentStore: store })
+        } catch (error) {
+          console.error('Failed to set current store:', error)
+          throw error
+        }
+      },
+
+      refreshStore: async () => {
+        try {
+          await storeIdentificationService.refreshStores()
+          const currentStore = await storeIdentificationService.getCurrentStore()
+          set({ currentStore })
+        } catch (error) {
+          console.error('Failed to refresh store data:', error)
+        }
+      },
+
       processSale: async (paymentMethod: string, user: string, warehouseId?: string): Promise<SaleResult> => {
         const state = get()
         
@@ -484,9 +554,14 @@ export const useCartStore = create<CartState>()(
             price: item.price,
             quantity: item.quantity,
             type: (item as any).type || 'product', // Default to product if type not specified
-            stock: (item as any).stock
+            stock: (item as any).stock,
+            cost: item.cost || 0 // Include cost price for reporting
           }))
           
+          // Get store metadata
+          const storeMetadata = state.currentStore ? 
+            await storeIdentificationService.generateTransactionMetadata() : null
+
           // Prepare sale transaction data
           const saleTransaction = {
             items: saleItems,
@@ -495,14 +570,24 @@ export const useCartStore = create<CartState>()(
             total: state.total,
             paymentMethod,
             user,
-            warehouseId,
+            warehouseId: warehouseId || state.currentStore?.warehouseId,
             customerId: state.selectedCustomer?.id,
+            customerName: state.selectedCustomer?.name,
             appliedDiscounts: {
               cartDiscount: state.discount,
               discountInfo: state.discountInfo,
               coupons: state.appliedCoupons,
               totalSavings: state.totalSavings
-            }
+            },
+            storeInfo: state.currentStore ? {
+              storeId: state.currentStore.id,
+              storeName: state.currentStore.name,
+              storeCode: state.currentStore.code,
+              warehouseId: state.currentStore.warehouseId,
+              warehouseName: state.currentStore.warehouseName,
+              terminalId: storeMetadata?.terminalId,
+              deviceId: storeMetadata?.deviceId
+            } : null
           }
           
           // Call sales API

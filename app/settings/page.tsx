@@ -19,7 +19,9 @@ import {
   Download,
   Upload,
   Save,
-  RefreshCw
+  RefreshCw,
+  DollarSign,
+  ArrowRightLeft
 } from "lucide-react"
 import Link from "next/link"
 import { useSettingsStore } from "@/stores/settings"
@@ -30,6 +32,7 @@ export default function SettingsPage() {
   const {
     settings,
     updateStoreSettings,
+    updateCurrencySettings,
     updateReceiptSettings,
     updatePaymentSettings,
     updateInventorySettings,
@@ -124,8 +127,9 @@ export default function SettingsPage() {
 
       <div className="max-w-4xl mx-auto p-6">
         <Tabs defaultValue="store" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
             <TabsTrigger value="store">Store</TabsTrigger>
+            <TabsTrigger value="currency">Currency</TabsTrigger>
             <TabsTrigger value="receipt">Receipt</TabsTrigger>
             <TabsTrigger value="payment">Payment</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
@@ -239,6 +243,110 @@ export default function SettingsPage() {
                         address: { ...settings.store.address, zipCode: e.target.value }
                       })}
                     />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="currency">
+            <Card className="bg-white/80 backdrop-blur-sm border-purple-100">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5" />
+                  Multi-Currency Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="exchangeRate">USD to LBP Exchange Rate</Label>
+                    <Input
+                      id="exchangeRate"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={settings.currency.exchangeRate}
+                      onChange={(e) => updateCurrencySettings({ exchangeRate: parseFloat(e.target.value) || 89500 })}
+                      placeholder="89500"
+                    />
+                    <p className="text-sm text-slate-500">Current rate: 1 USD = {settings.currency.exchangeRate.toLocaleString()} LBP</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Primary Currency</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={settings.currency.primaryCurrency === 'USD' ? 'default' : 'outline'}
+                        onClick={() => updateCurrencySettings({ primaryCurrency: 'USD' })}
+                        className="flex-1"
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        USD
+                      </Button>
+                      <Button
+                        variant={settings.currency.primaryCurrency === 'LBP' ? 'default' : 'outline'}
+                        onClick={() => updateCurrencySettings({ primaryCurrency: 'LBP' })}
+                        className="flex-1"
+                      >
+                        🇱🇧 LBP
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Show Both Currencies</Label>
+                    <p className="text-sm text-slate-500">Display prices in both USD and LBP throughout the POS</p>
+                  </div>
+                  <Switch
+                    checked={settings.currency.showBothCurrencies}
+                    onCheckedChange={(checked) => updateCurrencySettings({ showBothCurrencies: checked })}
+                  />
+                </div>
+
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-semibold text-slate-800">Cash Payment Options</h3>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Accept USD Cash</Label>
+                      <p className="text-sm text-slate-500">Allow customers to pay with US Dollars</p>
+                    </div>
+                    <Switch
+                      checked={settings.currency.acceptUsdCash}
+                      onCheckedChange={(checked) => updateCurrencySettings({ acceptUsdCash: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Accept LBP Cash</Label>
+                      <p className="text-sm text-slate-500">Allow customers to pay with Lebanese Pounds</p>
+                    </div>
+                    <Switch
+                      checked={settings.currency.acceptLbpCash}
+                      onCheckedChange={(checked) => updateCurrencySettings({ acceptLbpCash: checked })}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 mb-2">Exchange Rate Preview</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-blue-600">USD → LBP</p>
+                      <p className="font-mono">$1.00 = {settings.currency.exchangeRate.toLocaleString()} LBP</p>
+                      <p className="font-mono">$10.00 = {(settings.currency.exchangeRate * 10).toLocaleString()} LBP</p>
+                      <p className="font-mono">$100.00 = {(settings.currency.exchangeRate * 100).toLocaleString()} LBP</p>
+                    </div>
+                    <div>
+                      <p className="text-blue-600">LBP → USD</p>
+                      <p className="font-mono">1,000 LBP = ${((1000 / settings.currency.exchangeRate)).toFixed(2)}</p>
+                      <p className="font-mono">10,000 LBP = ${((10000 / settings.currency.exchangeRate)).toFixed(2)}</p>
+                      <p className="font-mono">100,000 LBP = ${((100000 / settings.currency.exchangeRate)).toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>

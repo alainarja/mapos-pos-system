@@ -41,6 +41,7 @@ import {
   Move,
   RefreshCw,
   ArrowRightLeft,
+  Store,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -48,9 +49,15 @@ import { useCartStore } from "@/stores/cart"
 import { useInventoryStore } from "@/stores/inventory"
 import { useNotificationStore } from "@/stores/notifications"
 import { useUserStore } from "@/stores/user"
+import { useCashManagementStore } from "@/stores/cash-management"
+import { usePrintStore } from "@/stores/print"
 import { CouponInput } from "@/components/pos/coupon-input"
 import { ReturnsExchange } from "@/components/pos/returns-exchange"
 import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration"
+import { CashCountDialog } from "@/components/cash/cash-count-dialog"
+import { TaxBreakdown, InlineTaxDisplay } from "@/components/ui/tax-breakdown"
+import { CustomerSelector } from "@/components/pos/customer-selector"
+import { StoreSelector } from "@/components/pos/store-selector"
 
 interface Product {
   id: string
@@ -113,13 +120,17 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     totalSavings,
     appliedCoupons,
     couponValidationError,
+    selectedCustomer,
+    currentStore,
     addItem,
     removeItem,
     updateQuantity,
     clearCart,
     applyCoupon,
     removeCoupon,
+    selectCustomer,
     processSale,
+    initializeStore,
   } = useCartStore()
   
   const { unreadCount, addNotification } = useNotificationStore()
@@ -139,10 +150,22 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     refreshInventory,
   } = useInventoryStore()
   
+  const {
+    currentDrawerAmount,
+    addExpense,
+    getTodaysExpenses,
+    getTotalExpensesToday,
+    cashCounts,
+    getLatestCashCount
+  } = useCashManagementStore()
+  
+  const { printCashDrawerReport, loadCompanyInfo, refreshCompanyInfo, isLoadingCompanyInfo } = usePrintStore()
+  
   const [showCategorySelection, setShowCategorySelection] = useState(true)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showDiscountDialog, setShowDiscountDialog] = useState(false)
   const [showCustomerDialog, setShowCustomerDialog] = useState(false)
+  const [showStoreSelector, setShowStoreSelector] = useState(false)
   const [showCashManagement, setShowCashManagement] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -175,6 +198,8 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   // Ensure training mode is disabled on component mount
   useEffect(() => {
     setIsTrainingMode(false)
+    // Initialize store identification
+    initializeStore()
   }, [])
   const [showPriceOverride, setShowPriceOverride] = useState(false)
   const [priceOverrideItemId, setPriceOverrideItemId] = useState<string | null>(null)
@@ -193,11 +218,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [showQuickKeysConfig, setShowQuickKeysConfig] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
   const [searchConfigTerm, setSearchConfigTerm] = useState('')
-  const [expenses, setExpenses] = useState<Array<{id: string, description: string, amount: number, category: string, timestamp: Date}>>([])
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [expenseDescription, setExpenseDescription] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('general')
+  const [showCashCount, setShowCashCount] = useState(false)
 
   const addToCart = (item: DisplayItem) => {
     // Transform DisplayItem to cart-compatible format
@@ -232,15 +257,13 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       return
     }
 
-    const newExpense = {
-      id: Date.now().toString(),
+    addExpense({
       description: expenseDescription.trim(),
       amount: parseFloat(expenseAmount),
       category: expenseCategory,
-      timestamp: new Date()
-    }
+      cashier: user || 'Unknown'
+    })
 
-    setExpenses(prev => [newExpense, ...prev])
     setExpenseDescription('')
     setExpenseAmount('')
     setExpenseCategory('general')
@@ -497,6 +520,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
         setShowCashCalculator(true)
         setShowPaymentDialog(true)
       }
+      // Customer Selection
+      if (e.key === 'F7') {
+        e.preventDefault()
+        setShowCustomerDialog(true)
+      }
       // Customer Display View
       if (e.key === 'F9') {
         e.preventDefault()
@@ -542,6 +570,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showQuickKeys, cart.length, cart, subtotal, tax, total, totalSavings, appliedReferral, appliedCoupons, heldCarts.length, showCustomerDisplay])
+
+  // Initialize company info for printing
+  useEffect(() => {
+    loadCompanyInfo().catch(console.error)
+  }, [loadCompanyInfo])
 
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -605,28 +638,28 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
             ${transaction.items.map((item: any) => `
               <div class="item">
                 <span>${item.name} x${item.quantity}</span>
-                <span>$${(item.price * item.quantity).toFixed(2)}</span>
+                <span>$${((item.price || 0) * (item.quantity || 0)).toFixed(2)}</span>
               </div>
             `).join('')}
             <div class="divider"></div>
             <div class="item">
               <span>Subtotal:</span>
-              <span>$${transaction.subtotal.toFixed(2)}</span>
+              <span>$${(transaction.subtotal || 0).toFixed(2)}</span>
             </div>
             ${transaction.discount > 0 ? `
               <div class="item">
                 <span>Discount:</span>
-                <span>-$${transaction.discount.toFixed(2)}</span>
+                <span>-$${(transaction.discount || 0).toFixed(2)}</span>
               </div>
             ` : ''}
             <div class="item">
               <span>Tax:</span>
-              <span>$${transaction.tax.toFixed(2)}</span>
+              <span>$${(transaction.tax || 0).toFixed(2)}</span>
             </div>
             <div class="divider"></div>
             <div class="item total">
               <span>Total:</span>
-              <span>$${transaction.total.toFixed(2)}</span>
+              <span>$${(transaction.total || 0).toFixed(2)}</span>
             </div>
             <div class="divider"></div>
             <p style="text-align: center;">Payment: ${transaction.paymentMethod}</p>
@@ -1061,6 +1094,12 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
     setManagerPassword('')
   }
 
+  // Safe cart calculations with defaults - subtotal is already imported from cart store
+
+  // Safe function results with defaults
+  const safeCurrentDrawerAmount = typeof currentDrawerAmount === 'number' ? currentDrawerAmount : 0
+  const safeTotalExpensesToday = typeof getTotalExpensesToday === 'function' ? (getTotalExpensesToday() || 0) : 0
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50 text-slate-900">
       <style jsx>{`
@@ -1122,6 +1161,18 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
             >
               <DollarSign className="h-5 w-5" />
               <span>Cash Management</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 px-4 hover:bg-purple-50 hover:text-purple-700"
+              onClick={() => {
+                setShowCustomerDialog(true)
+                setIsSidebarOpen(false)
+              }}
+            >
+              <User className="h-5 w-5" />
+              <span>Customer Management</span>
             </Button>
             
             <Button
@@ -1826,13 +1877,110 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                     </div>
                   )}
                   <div className="flex justify-between text-sm font-medium">
-                    <span className="text-slate-600">Tax (8%):</span>
+                    <span className="text-slate-600">
+                      <InlineTaxDisplay items={cart} />
+                    </span>
                     <span className="text-slate-800">${tax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t border-purple-200">
                     <span className="text-slate-800">Total:</span>
                     <span className="text-purple-600">${total.toFixed(2)}</span>
                   </div>
+                </div>
+
+                {/* Tax Breakdown */}
+                {cart.length > 0 && (
+                  <div className="pt-4">
+                    <TaxBreakdown items={cart} className="text-xs" />
+                  </div>
+                )}
+
+                {/* Store Information */}
+                <div className="pt-4 border-t border-purple-200/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Store</label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowStoreSelector(true)}
+                      className="text-xs px-2 py-1"
+                    >
+                      <Store className="h-3 w-3 mr-1" />
+                      {currentStore ? 'Change' : 'Select'}
+                    </Button>
+                  </div>
+                  
+                  {currentStore ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-green-900 text-sm">{currentStore.name}</p>
+                          <p className="text-xs text-green-700">{currentStore.code}</p>
+                          <p className="text-xs text-green-600">{currentStore.warehouseName}</p>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Active
+                        </Badge>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-amber-700">No store selected</p>
+                      <p className="text-xs text-amber-600 mt-1">Select a store for proper transaction tracking</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Customer Selection */}
+                <div className="pt-4 border-t border-purple-200/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Customer</label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCustomerDialog(true)}
+                      className="text-xs px-2 py-1"
+                    >
+                      <User className="h-3 w-3 mr-1" />
+                      {selectedCustomer ? 'Change' : 'Select'}
+                    </Button>
+                  </div>
+                  
+                  {selectedCustomer ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-blue-900 text-sm">{selectedCustomer.name}</p>
+                          <p className="text-xs text-blue-700">{selectedCustomer.email}</p>
+                          <p className="text-xs text-blue-600">{selectedCustomer.phone}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              <Star className="h-2 w-2 mr-1" />
+                              {selectedCustomer.tier}
+                            </Badge>
+                            <span className="text-xs text-blue-600">
+                              {selectedCustomer.loyaltyPoints} points
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => selectCustomer(null)}
+                          className="text-red-600 hover:bg-red-50 p-1"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+                      <p className="text-sm text-gray-600">No customer selected</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select a customer to earn loyalty points and enable CRM integration
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Coupon Input */}
@@ -1922,6 +2070,27 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
               <h3 className="text-xl font-bold mb-4 text-center bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
                 Payment - ${total.toFixed(2)}
               </h3>
+              
+              {/* Customer Information */}
+              {selectedCustomer && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-blue-900 text-sm">{selectedCustomer.name}</p>
+                      <p className="text-xs text-blue-700">{selectedCustomer.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">
+                        <Star className="h-2 w-2 mr-1" />
+                        {selectedCustomer.tier}
+                      </Badge>
+                      <span className="text-xs text-blue-600">
+                        {selectedCustomer.loyaltyPoints} pts
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Cash Calculator */}
               {showCashCalculator && (
@@ -2071,10 +2240,29 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 <h3 className="font-semibold text-gray-800">Cash Drawer</h3>
                 <div className="bg-emerald-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Current Drawer</p>
-                  <p className="text-2xl font-bold text-emerald-600">$1,234.56</p>
+                  <p className="text-2xl font-bold text-emerald-600">${safeCurrentDrawerAmount.toFixed(2)}</p>
                 </div>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Count Drawer</Button>
-                <Button className="w-full" variant="outline">Print Cash Report</Button>
+                <Button 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setShowCashCount(true)}
+                >
+                  Count Drawer
+                </Button>
+                <Button 
+                  className="w-full" 
+                  variant="outline"
+                  onClick={() => {
+                    printCashDrawerReport(
+                      safeCurrentDrawerAmount,
+                      getTodaysExpenses(),
+                      cashCounts.filter(count => 
+                        new Date(count.timestamp).toDateString() === new Date().toDateString()
+                      )
+                    )
+                  }}
+                >
+                  Print Cash Report
+                </Button>
               </div>
               
               {/* Expenses Section */}
@@ -2095,33 +2283,27 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 <div className="bg-red-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Today's Expenses</p>
                   <p className="text-2xl font-bold text-red-600">
-                    ${expenses
-                      .filter(expense => 
-                        new Date(expense.timestamp).toDateString() === new Date().toDateString()
-                      )
-                      .reduce((sum, expense) => sum + expense.amount, 0)
-                      .toFixed(2)
-                    }
+                    ${safeTotalExpensesToday.toFixed(2)}
                   </p>
                 </div>
                 
                 {/* Recent Expenses */}
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {expenses.slice(0, 5).map((expense) => (
+                  {getTodaysExpenses().slice(0, 5).map((expense) => (
                     <div key={expense.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <div>
                         <p className="font-medium text-sm">{expense.description}</p>
                         <p className="text-xs text-gray-500">{expense.category}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-red-600">${expense.amount.toFixed(2)}</p>
+                        <p className="font-semibold text-red-600">${(expense.amount || 0).toFixed(2)}</p>
                         <p className="text-xs text-gray-500">
                           {expense.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>
                       </div>
                     </div>
                   ))}
-                  {expenses.length === 0 && (
+                  {getTodaysExpenses().length === 0 && (
                     <p className="text-gray-500 text-center py-4">No expenses recorded today</p>
                   )}
                 </div>
@@ -2289,6 +2471,39 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refunds
               </Button>
+              
+              <div className="border-t pt-3 mt-3">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await refreshCompanyInfo()
+                      addNotification({
+                        id: Date.now().toString(),
+                        type: 'success',
+                        title: 'Company Info Updated',
+                        message: 'Store and company information has been refreshed from inventory system',
+                        timestamp: new Date(),
+                        isRead: false
+                      })
+                    } catch (error) {
+                      addNotification({
+                        id: Date.now().toString(),
+                        type: 'error',
+                        title: 'Refresh Failed',
+                        message: 'Failed to refresh company info. Using cached data.',
+                        timestamp: new Date(),
+                        isRead: false
+                      })
+                    }
+                  }}
+                  disabled={isLoadingCompanyInfo}
+                >
+                  <RotateCcw className={`h-4 w-4 mr-2 ${isLoadingCompanyInfo ? 'animate-spin' : ''}`} />
+                  {isLoadingCompanyInfo ? 'Refreshing...' : 'Refresh Store Info'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -2326,7 +2541,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-lg">${transaction.total.toFixed(2)}</p>
+                        <p className="font-bold text-lg">${(transaction.total || 0).toFixed(2)}</p>
                         <Button 
                           size="sm" 
                           variant="outline" 
@@ -2470,7 +2685,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                         <p className="text-sm text-gray-600">{new Date(heldCart.timestamp).toLocaleString()}</p>
                         <p className="text-sm text-gray-600">
                           Items: {heldCart.items.reduce((sum: number, item: any) => sum + item.quantity, 0)} • 
-                          Total: ${heldCart.total.toFixed(2)}
+                          Total: ${(heldCart.total || 0).toFixed(2)}
                           {heldCart.referral && ` • Referral: ${heldCart.referral}`}
                         </p>
                       </div>
@@ -3153,7 +3368,9 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                             <span className="font-semibold text-gray-800">${subtotal.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-xl">
-                            <span className="font-medium text-gray-700">Tax ({((tax/subtotal)*100).toFixed(0)}%):</span>
+                            <span className="font-medium text-gray-700">
+                              <InlineTaxDisplay items={cart} />:
+                            </span>
                             <span className="font-semibold text-gray-800">${tax.toFixed(2)}</span>
                           </div>
                           {totalSavings > 0 && (
@@ -3422,6 +3639,31 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
           </div>
         </div>
       )}
+
+      {/* Customer Selector Dialog */}
+      <CustomerSelector
+        isOpen={showCustomerDialog}
+        onClose={() => setShowCustomerDialog(false)}
+        onSelectCustomer={selectCustomer}
+        selectedCustomer={selectedCustomer}
+      />
+
+      {/* Store Selector Dialog */}
+      {showStoreSelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+            <StoreSelector onClose={() => setShowStoreSelector(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Cash Count Dialog */}
+      <CashCountDialog
+        isOpen={showCashCount}
+        onClose={() => setShowCashCount(false)}
+        expectedAmount={safeCurrentDrawerAmount}
+        cashier={user || "Unknown"}
+      />
     </div>
   )
 }

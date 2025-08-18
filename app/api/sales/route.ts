@@ -10,6 +10,7 @@ interface SaleItem {
   quantity: number
   type: 'product' | 'service'
   stock?: number
+  cost?: number // Cost price for reporting
 }
 
 interface SaleTransaction {
@@ -82,7 +83,8 @@ export async function POST(request: NextRequest) {
             price: item.price,
             total: item.price * item.quantity,
             type: item.type,
-            sku: item.id // Using item ID as SKU for now
+            sku: item.id, // Using item ID as SKU for now
+            costPrice: item.cost || 0 // Include cost price for reporting
           })),
           body.paymentMethod,
           body.currency || 'USD'

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { companyInfoService, CompanyInfo } from '@/lib/services/company-info-service'
 
 export interface PrintItem {
   name: string
@@ -83,6 +84,8 @@ interface PrintStore {
   printerStatus: 'ready' | 'busy' | 'error' | 'offline'
   printQueue: Receipt[]
   isProcessingQueue: boolean
+  companyInfo: CompanyInfo | null
+  isLoadingCompanyInfo: boolean
   
   // Actions
   generateReceipt: (
@@ -118,6 +121,8 @@ interface PrintStore {
   addToHistory: (receipt: Receipt) => void
   clearPrintHistory: () => void
   clearQueue: () => void
+  loadCompanyInfo: () => Promise<void>
+  refreshCompanyInfo: () => Promise<void>
 }
 
 export const usePrintStore = create<PrintStore>((set, get) => ({
@@ -151,6 +156,8 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
   printerStatus: 'ready',
   printQueue: [],
   isProcessingQueue: false,
+  companyInfo: null,
+  isLoadingCompanyInfo: false,
 
   // Actions
   generateReceipt: (items, paymentInfo, cashier, customer) => {
@@ -176,6 +183,11 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
 
   printReceipt: async (receipt, options) => {
     const printOptions = { ...get().defaultPrintOptions, ...options }
+    
+    // Ensure company info is loaded
+    if (!get().companyInfo) {
+      await get().loadCompanyInfo()
+    }
     
     try {
       set({ printerStatus: 'busy' })
@@ -349,6 +361,11 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
   },
 
   printDailyReport: async () => {
+    // Ensure company info is loaded
+    if (!get().companyInfo) {
+      await get().loadCompanyInfo()
+    }
+    
     try {
       set({ printerStatus: 'busy' })
       
@@ -374,6 +391,11 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
   },
 
   printXReport: async () => {
+    // Ensure company info is loaded
+    if (!get().companyInfo) {
+      await get().loadCompanyInfo()
+    }
+    
     try {
       set({ printerStatus: 'busy' })
       
@@ -398,6 +420,11 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
   },
 
   printZReport: async () => {
+    // Ensure company info is loaded
+    if (!get().companyInfo) {
+      await get().loadCompanyInfo()
+    }
+    
     try {
       set({ printerStatus: 'busy' })
       
@@ -422,6 +449,11 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
   },
 
   printEndOfDayReport: async (reportData) => {
+    // Ensure company info is loaded
+    if (!get().companyInfo) {
+      await get().loadCompanyInfo()
+    }
+    
     try {
       set({ printerStatus: 'busy' })
       
@@ -544,9 +576,40 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
     set({ printQueue: [] })
   },
 
+  loadCompanyInfo: async () => {
+    if (get().isLoadingCompanyInfo) {
+      return // Already loading
+    }
+
+    set({ isLoadingCompanyInfo: true })
+    
+    try {
+      const companyInfo = await companyInfoService.getCompanyInfo()
+      set({ companyInfo, isLoadingCompanyInfo: false })
+    } catch (error) {
+      console.error('Failed to load company info:', error)
+      set({ isLoadingCompanyInfo: false })
+      // Keep existing companyInfo if any, otherwise null
+    }
+  },
+
+  refreshCompanyInfo: async () => {
+    set({ isLoadingCompanyInfo: true })
+    
+    try {
+      const companyInfo = await companyInfoService.refreshCompanyInfo()
+      set({ companyInfo, isLoadingCompanyInfo: false })
+    } catch (error) {
+      console.error('Failed to refresh company info:', error)
+      set({ isLoadingCompanyInfo: false })
+      // Keep existing companyInfo if any, otherwise null
+    }
+  },
+
   // Helper methods (not exposed in interface but available via get())
   formatReceiptForPrint: (receipt: Receipt, options: PrintOptions) => {
     const { includeLogo, includeBarcode, includeCustomerInfo } = options
+    const { companyInfo } = get()
     
     return `
       <!DOCTYPE html>
@@ -639,12 +702,14 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       <body>
         <div class="receipt">
           <div class="header">
-            ${includeLogo ? '<div class="logo">MAPOS</div>' : ''}
+            ${includeLogo ? `<div class="logo">${companyInfo?.name || 'MAPOS'}</div>` : ''}
             <div class="store-info">
-              Point of Sale System<br>
-              123 Main Street<br>
-              Your City, State 12345<br>
-              Phone: (555) 123-4567
+              ${companyInfo?.businessName || companyInfo?.name || 'Point of Sale System'}<br>
+              ${companyInfo?.address.street || '123 Main Street'}<br>
+              ${companyInfo?.address.city || 'Your City'}, ${companyInfo?.address.state || 'State'} ${companyInfo?.address.zipCode || '12345'}<br>
+              Phone: ${companyInfo?.contact.phone ? companyInfoService.formatPhone(companyInfo.contact.phone) : '(555) 123-4567'}
+              ${companyInfo?.contact.email ? `<br>Email: ${companyInfo.contact.email}` : ''}
+              ${companyInfo?.contact.website ? `<br>Web: ${companyInfo.contact.website}` : ''}
             </div>
           </div>
           
@@ -740,9 +805,11 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
           ` : ''}
 
           <div class="footer">
-            Thank you for your business!<br>
-            Please keep your receipt<br>
-            Return policy: 30 days with receipt<br>
+            ${companyInfo?.settings.receiptFooter ? 
+              companyInfo.settings.receiptFooter.split('\n').join('<br>') + '<br><br>' :
+              'Thank you for your business!<br>Please keep your receipt<br>'
+            }
+            ${companyInfo?.settings.returnPolicy || 'Return policy: 30 days with receipt'}<br>
             <br>
             Powered by MAPOS
           </div>
@@ -760,6 +827,7 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
     
     const totalSales = todayReceipts.reduce((sum, receipt) => sum + receipt.total, 0)
     const totalTransactions = todayReceipts.length
+    const { companyInfo } = get()
     
     return `
       <!DOCTYPE html>
@@ -780,7 +848,9 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       <body>
         <div class="report">
           <div class="header">
-            <h1>MAPOS - Daily Sales Report</h1>
+            <h1>${companyInfo?.name || 'MAPOS'} - Daily Sales Report</h1>
+            <p>${companyInfo?.businessName || companyInfo?.name || 'Point of Sale System'}</p>
+            <p>${companyInfo?.address ? companyInfoService.formatAddress(companyInfo.address) : '123 Main Street, Your City, State 12345'}</p>
             <p>Date: ${today.toDateString()}</p>
           </div>
           
@@ -831,6 +901,7 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
     const todayReceipts = get().printHistory.filter(
       receipt => receipt.timestamp.toDateString() === today.toDateString()
     )
+    const { companyInfo } = get()
     
     return `
       <!DOCTYPE html>
@@ -848,7 +919,8 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       <body>
         <div class="report">
           <div class="header">
-            <h2>MAPOS X-REPORT</h2>
+            <h2>${companyInfo?.name || 'MAPOS'} X-REPORT</h2>
+            <p>${companyInfo?.businessName || companyInfo?.name || 'Point of Sale System'}</p>
             <p>Date: ${today.toLocaleDateString()}</p>
             <p>Time: ${today.toLocaleTimeString()}</p>
           </div>
@@ -891,6 +963,7 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
     const todayReceipts = get().printHistory.filter(
       receipt => receipt.timestamp.toDateString() === today.toDateString()
     )
+    const { companyInfo } = get()
     
     return `
       <!DOCTYPE html>
@@ -909,7 +982,8 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       <body>
         <div class="report">
           <div class="header">
-            <h2>MAPOS Z-REPORT</h2>
+            <h2>${companyInfo?.name || 'MAPOS'} Z-REPORT</h2>
+            <p>${companyInfo?.businessName || companyInfo?.name || 'Point of Sale System'}</p>
             <p>END OF DAY REPORT</p>
             <p>Date: ${today.toLocaleDateString()}</p>
             <p>Time: ${today.toLocaleTimeString()}</p>
@@ -946,6 +1020,8 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
   },
 
   formatEndOfDayReportForPrint: (reportData: any) => {
+    const { companyInfo } = get()
+    
     return `
       <!DOCTYPE html>
       <html>
@@ -981,7 +1057,9 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       <body>
         <div class="report">
           <div class="header">
-            <h2>MAPOS END OF DAY REPORT</h2>
+            <h2>${companyInfo?.name || 'MAPOS'} END OF DAY REPORT</h2>
+            <p>${companyInfo?.businessName || companyInfo?.name || 'Point of Sale System'}</p>
+            <p>${companyInfo?.address ? companyInfoService.formatAddress(companyInfo.address) : '123 Main Street, Your City, State 12345'}</p>
             <p><strong>Date: ${new Date(reportData.date).toLocaleDateString('en-US', { 
               weekday: 'long', 
               year: 'numeric', 
@@ -1140,5 +1218,129 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       </body>
       </html>
     `
+  },
+
+  /**
+   * Generate and print cash drawer report
+   */
+  printCashDrawerReport: (drawerAmount: number, expenses: any[], cashCounts: any[]) => {
+    const currentDate = new Date()
+    const dateStr = currentDate.toLocaleDateString()
+    const timeStr = currentDate.toLocaleTimeString()
+    
+    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
+    const latestCount = cashCounts.length > 0 ? cashCounts[0] : null
+    const { companyInfo } = get()
+    
+    const reportHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Cash Drawer Report - ${dateStr}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 20px; }
+          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+          .store-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+          .report-title { font-size: 16px; font-weight: bold; margin: 10px 0; }
+          .section { margin: 15px 0; }
+          .section-title { font-weight: bold; border-bottom: 1px solid #000; padding: 5px 0; margin-bottom: 10px; }
+          .row { display: flex; justify-content: space-between; margin: 3px 0; }
+          .row.total { font-weight: bold; border-top: 1px solid #000; padding-top: 5px; margin-top: 10px; }
+          .variance-positive { color: #d97706; }
+          .variance-negative { color: #dc2626; }
+          .expense-item { margin: 2px 0; font-size: 11px; }
+          @media print { body { margin: 0; padding: 10px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="store-name">${companyInfo?.name || 'MAPOS'} ${companyInfo?.businessName ? `- ${companyInfo.businessName}` : 'Retail Store'}</div>
+          <div>Cash Drawer Report</div>
+          <div>${dateStr} - ${timeStr}</div>
+          ${companyInfo?.address ? `<div style="font-size: 10px; margin-top: 5px;">${companyInfoService.formatAddress(companyInfo.address)}</div>` : ''}
+        </div>
+
+        <div class="section">
+          <div class="section-title">CASH DRAWER STATUS</div>
+          <div class="row">
+            <span>Current Drawer Amount:</span>
+            <span>$${drawerAmount.toFixed(2)}</span>
+          </div>
+          ${latestCount ? `
+          <div class="row">
+            <span>Last Count Amount:</span>
+            <span>$${latestCount.totalCounted.toFixed(2)}</span>
+          </div>
+          <div class="row">
+            <span>Count Variance:</span>
+            <span class="${latestCount.variance >= 0 ? 'variance-positive' : 'variance-negative'}">
+              ${latestCount.variance >= 0 ? '+' : ''}$${latestCount.variance.toFixed(2)}
+            </span>
+          </div>
+          <div class="row">
+            <span>Last Count By:</span>
+            <span>${latestCount.cashier}</span>
+          </div>
+          <div class="row">
+            <span>Count Time:</span>
+            <span>${new Date(latestCount.timestamp).toLocaleString()}</span>
+          </div>
+          ` : '<div class="row"><span>No cash counts recorded today</span></div>'}
+        </div>
+
+        <div class="section">
+          <div class="section-title">TODAY'S EXPENSES</div>
+          ${expenses.length > 0 ? expenses.map(expense => `
+            <div class="expense-item">
+              <div class="row">
+                <span>${expense.description} (${expense.category})</span>
+                <span>$${expense.amount.toFixed(2)}</span>
+              </div>
+            </div>
+          `).join('') : '<div class="row"><span>No expenses recorded today</span></div>'}
+          <div class="row total">
+            <span>Total Expenses:</span>
+            <span>$${totalExpenses.toFixed(2)}</span>
+          </div>
+        </div>
+
+        ${latestCount ? `
+        <div class="section">
+          <div class="section-title">CASH COUNT BREAKDOWN</div>
+          <div class="row"><span>$100 Bills:</span><span>${latestCount.denominations.hundreds} × $100 = $${(latestCount.denominations.hundreds * 100).toFixed(2)}</span></div>
+          <div class="row"><span>$50 Bills:</span><span>${latestCount.denominations.fifties} × $50 = $${(latestCount.denominations.fifties * 50).toFixed(2)}</span></div>
+          <div class="row"><span>$20 Bills:</span><span>${latestCount.denominations.twenties} × $20 = $${(latestCount.denominations.twenties * 20).toFixed(2)}</span></div>
+          <div class="row"><span>$10 Bills:</span><span>${latestCount.denominations.tens} × $10 = $${(latestCount.denominations.tens * 10).toFixed(2)}</span></div>
+          <div class="row"><span>$5 Bills:</span><span>${latestCount.denominations.fives} × $5 = $${(latestCount.denominations.fives * 5).toFixed(2)}</span></div>
+          <div class="row"><span>$1 Bills:</span><span>${latestCount.denominations.ones} × $1 = $${(latestCount.denominations.ones * 1).toFixed(2)}</span></div>
+          <div class="row"><span>Quarters:</span><span>${latestCount.denominations.quarters} × $0.25 = $${(latestCount.denominations.quarters * 0.25).toFixed(2)}</span></div>
+          <div class="row"><span>Dimes:</span><span>${latestCount.denominations.dimes} × $0.10 = $${(latestCount.denominations.dimes * 0.10).toFixed(2)}</span></div>
+          <div class="row"><span>Nickels:</span><span>${latestCount.denominations.nickels} × $0.05 = $${(latestCount.denominations.nickels * 0.05).toFixed(2)}</span></div>
+          <div class="row"><span>Pennies:</span><span>${latestCount.denominations.pennies} × $0.01 = $${(latestCount.denominations.pennies * 0.01).toFixed(2)}</span></div>
+          ${latestCount.notes ? `<div style="margin-top: 10px;"><strong>Notes:</strong> ${latestCount.notes}</div>` : ''}
+        </div>
+        ` : ''}
+
+        <div class="section">
+          <div style="text-align: center; font-weight: bold; margin-top: 20px;">
+            <p>*** CASH DRAWER REPORT ***</p>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    // Open print window
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
+    if (printWindow) {
+      printWindow.document.write(reportHtml)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => {
+        printWindow.print()
+      }, 250)
+    }
   },
 }))

@@ -100,78 +100,12 @@ const generateReceiptNumber = () => {
   return `${dateStr}-${timeStr}-${random}`
 }
 
-// Mock transaction data with proper structure
-const generateMockTransactions = (): Transaction[] => {
-  const today = new Date()
-  const mockTransactions: Transaction[] = []
-  
-  // Generate transactions for the last 30 days
-  for (let i = 0; i < 50; i++) {
-    const transactionDate = new Date(today.getTime() - (Math.random() * 30 * 24 * 60 * 60 * 1000))
-    const items: CartItem[] = []
-    const itemCount = Math.floor(Math.random() * 5) + 1
-    
-    let subtotal = 0
-    for (let j = 0; j < itemCount; j++) {
-      const mockItems = [
-        { name: "Golden Croissant", price: 4.50, image: "/golden-croissant.png" },
-        { name: "Blueberry Muffin", price: 3.25, image: "/blueberry-muffin.png" },
-        { name: "Chocolate Bar", price: 2.99, image: "/chocolate-bar.png" },
-        { name: "Cup of Green Tea", price: 2.50, image: "/cup-of-green-tea.png" },
-        { name: "Protein Bar", price: 5.99, image: "/protein-bar.png" },
-        { name: "Coffee Beans", price: 8.99, image: "/pile-of-coffee-beans.png" },
-        { name: "Energy Drink", price: 3.49, image: "/vibrant-energy-drink.png" },
-        { name: "Wrap Sandwich", price: 7.25, image: "/wrap-sandwich.png" }
-      ]
-      
-      const mockItem = mockItems[Math.floor(Math.random() * mockItems.length)]
-      const quantity = Math.floor(Math.random() * 3) + 1
-      const itemTotal = mockItem.price * quantity
-      
-      items.push({
-        id: `item-${j}-${i}`,
-        name: mockItem.name,
-        price: mockItem.price,
-        quantity: quantity,
-        image: mockItem.image
-      })
-      
-      subtotal += itemTotal
-    }
-    
-    const tax = subtotal * 0.08
-    const discount = Math.random() > 0.8 ? subtotal * (Math.random() * 0.2) : 0
-    const total = subtotal + tax - discount
-    
-    const paymentMethods = ["Cash", "Card", "Digital Wallet", "Gift Card"]
-    const cashiers = ["John Smith", "Sarah Johnson", "Mike Wilson", "Emma Davis", "Current User"]
-    const statuses: Transaction['status'][] = ["completed", "completed", "completed", "refunded", "cancelled"]
-    
-    mockTransactions.push({
-      id: generateTransactionId(),
-      date: transactionDate.toISOString().split('T')[0],
-      time: transactionDate.toLocaleTimeString('en-US', { hour12: false }),
-      total: Math.round(total * 100) / 100,
-      subtotal: Math.round(subtotal * 100) / 100,
-      tax: Math.round(tax * 100) / 100,
-      discount: Math.round(discount * 100) / 100,
-      items: items,
-      paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
-      cashier: cashiers[Math.floor(Math.random() * cashiers.length)],
-      customerId: Math.random() > 0.5 ? `customer-${Math.floor(Math.random() * 10)}` : undefined,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      receiptNumber: generateReceiptNumber()
-    })
-  }
-  
-  return mockTransactions.sort((a, b) => new Date(`${b.date} ${b.time}`).getTime() - new Date(`${a.date} ${a.time}`).getTime())
-}
 
 export const useTransactionStore = create<TransactionStore>()(
   persist(
     (set, get) => ({
       // Initial State
-      transactions: generateMockTransactions(),
+      transactions: [],
       searchTerm: '',
       dateFilter: {
         start: null,

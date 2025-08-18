@@ -38,6 +38,10 @@ export interface Product {
   seasonality?: 'all_year' | 'seasonal' | 'holiday'
   rating?: number
   reviewCount?: number
+  // Tax/VAT information
+  taxRate?: number // Tax rate as decimal (e.g., 0.08 for 8%)
+  taxExempt?: boolean // Whether this item is tax exempt
+  taxCategory?: string // Tax category for different tax types
 }
 
 export interface Category {
@@ -60,6 +64,7 @@ export interface CartItem {
   discount?: number
   discountType?: 'percentage' | 'fixed'
   taxRate?: number
+  cost?: number // Cost price for reporting
 }
 
 export interface Customer {
@@ -111,6 +116,16 @@ export interface Transaction {
   customerId?: string
   status: 'pending' | 'completed' | 'refunded' | 'cancelled'
   receiptNumber: string
+  // Multi-currency support
+  paymentBreakdown?: {
+    usd?: number
+    lbp?: number
+    card?: number
+    digitalWallet?: number
+    giftCard?: number
+  }
+  exchangeRate?: number // USD to LBP rate at time of transaction
+  totalLbp?: number // Total amount in LBP
 }
 
 export interface User {
@@ -201,6 +216,15 @@ export interface Settings {
     taxRate: number
     currency: string
     timezone: string
+  }
+  currency: {
+    primaryCurrency: 'USD' | 'LBP'
+    secondaryCurrency: 'USD' | 'LBP'
+    exchangeRate: number // USD to LBP
+    autoUpdateRate: boolean
+    showBothCurrencies: boolean
+    acceptUsdCash: boolean
+    acceptLbpCash: boolean
   }
   receipt: {
     header: string

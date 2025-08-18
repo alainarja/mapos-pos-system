@@ -150,7 +150,9 @@ const mockProducts: Product[] = [
     isFeatured: true,
     isNew: false,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    taxRate: 0.08,
+    taxCategory: "food"
   },
   {
     id: "2",
@@ -171,7 +173,9 @@ const mockProducts: Product[] = [
     isFeatured: false,
     isNew: true,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    taxExempt: true,
+    taxCategory: "health"
   },
   {
     id: "3",
@@ -192,7 +196,9 @@ const mockProducts: Product[] = [
     isFeatured: true,
     isNew: false,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    taxRate: 0.15,
+    taxCategory: "luxury"
   },
   {
     id: "4",
@@ -213,7 +219,9 @@ const mockProducts: Product[] = [
     isFeatured: false,
     isNew: false,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    taxRate: 0.05,
+    taxCategory: "food"
   },
   {
     id: "5",
@@ -234,7 +242,9 @@ const mockProducts: Product[] = [
     isFeatured: false,
     isNew: true,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    taxRate: 0.05,
+    taxCategory: "food"
   },
   {
     id: "6",
