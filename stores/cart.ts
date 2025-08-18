@@ -96,7 +96,8 @@ export const useCartStore = create<CartState>()(
             category: product.category,
             discount: 0,
             taxRate: product.taxExempt ? 0 : (product.taxRate || 0), // Use product tax rate, no default
-            cost: product.cost || 0 // Capture cost price for reporting
+            cost: product.cost || 0, // Capture cost price for reporting
+            type: (product as any).type || 'product' // Include type field for inventory processing
           }
           set({ items: [...items, newItem] })
         }
@@ -553,7 +554,7 @@ export const useCartStore = create<CartState>()(
             name: item.name,
             price: item.price,
             quantity: item.quantity,
-            type: (item as any).type || 'product', // Default to product if type not specified
+            type: item.type || 'product', // Use type from cart item, default to product if not specified
             stock: (item as any).stock,
             cost: item.cost || 0 // Include cost price for reporting
           }))

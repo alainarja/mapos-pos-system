@@ -65,6 +65,7 @@ export interface CartItem {
   discountType?: 'percentage' | 'fixed'
   taxRate?: number
   cost?: number // Cost price for reporting
+  type?: 'product' | 'service' // Type to distinguish between products and services
 }
 
 export interface Customer {
