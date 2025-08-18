@@ -57,7 +57,6 @@ import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration
 import { CashCountDialog } from "@/components/cash/cash-count-dialog"
 import { TaxBreakdown, InlineTaxDisplay } from "@/components/ui/tax-breakdown"
 import { CustomerSelector } from "@/components/pos/customer-selector"
-import { StoreSelector } from "@/components/pos/store-selector"
 
 interface Product {
   id: string
@@ -168,7 +167,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showDiscountDialog, setShowDiscountDialog] = useState(false)
   const [showCustomerDialog, setShowCustomerDialog] = useState(false)
-  const [showStoreSelector, setShowStoreSelector] = useState(false)
   const [showCashManagement, setShowCashManagement] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -1909,21 +1907,10 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 )}
 
                 {/* Store Information */}
-                <div className="pt-4 border-t border-purple-200/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">Store</label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowStoreSelector(true)}
-                      className="text-xs px-2 py-1"
-                    >
-                      <Store className="h-3 w-3 mr-1" />
-                      {currentStore ? 'Change' : 'Select'}
-                    </Button>
-                  </div>
-                  
-                  {currentStore ? (
+                {/* Store Display (loaded on login) */}
+                {currentStore && (
+                  <div className="pt-4 border-t border-purple-200/30">
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">Store Location</label>
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -1936,13 +1923,8 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                         </Badge>
                       </div>
                     </div>
-                  ) : (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-                      <p className="text-xs text-amber-700">No store selected</p>
-                      <p className="text-xs text-amber-600 mt-1">Select a store for proper transaction tracking</p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Customer Selection */}
                 <div className="pt-4 border-t border-purple-200/30">
@@ -3660,15 +3642,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
         onSelectCustomer={selectCustomer}
         selectedCustomer={selectedCustomer}
       />
-
-      {/* Store Selector Dialog */}
-      {showStoreSelector && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-            <StoreSelector onClose={() => setShowStoreSelector(false)} />
-          </div>
-        </div>
-      )}
 
       {/* Cash Count Dialog */}
       <CashCountDialog
