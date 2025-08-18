@@ -320,10 +320,12 @@ export function CustomerSelector({
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <h4 className="font-medium text-gray-900">{customer.name}</h4>
-                              <Badge variant={customer.tier === 'gold' ? 'default' : 'secondary'}>
-                                <Star className="h-3 w-3 mr-1" />
-                                {customer.tier}
-                              </Badge>
+                              {customer.tier && (
+                                <Badge variant={customer.tier === 'gold' ? 'default' : 'secondary'} className="flex items-center">
+                                  <Star className="h-3 w-3 mr-1 inline-block" />
+                                  <span>{customer.tier}</span>
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-4 text-sm text-gray-600">
                               <div className="flex items-center gap-1">
