@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { externalAPI } from '@/lib/services/external-api'
 import { inventoryIntegration } from '@/lib/services/inventory-integration'
+import { crmIntegration } from '@/lib/services/crm-integration'
 
 interface SaleItem {
   id: string
@@ -20,6 +21,8 @@ interface SaleTransaction {
   user: string
   warehouseId?: string
   customerId?: string
+  customerName?: string
+  currency?: string
 }
 
 
@@ -63,6 +66,44 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
     
+    // Process CRM invoice creation if customer is selected
+    let crmResult = null
+    if (body.customerId && body.customerName) {
+      try {
+        crmResult = await crmIntegration.processPOSSale(
+          saleId,
+          body.customerId,
+          body.customerName,
+          body.total,
+          body.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.price * item.quantity,
+            type: item.type,
+            sku: item.id // Using item ID as SKU for now
+          })),
+          body.paymentMethod,
+          body.currency || 'USD'
+        )
+        
+        console.log('CRM invoice integration result:', {
+          success: crmResult.success,
+          invoice_id: crmResult.invoice_id,
+          invoice_number: crmResult.invoice_number,
+          serviceAvailable: crmResult.crmServiceAvailable
+        })
+      } catch (error) {
+        console.error('CRM integration failed:', error)
+        crmResult = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          crmServiceAvailable: false
+        }
+      }
+    }
+    
     // Create sale record
     const saleRecord = {
       id: saleId,
@@ -75,9 +116,17 @@ export async function POST(request: NextRequest) {
       user: body.user,
       warehouseId: body.warehouseId,
       customerId: body.customerId,
+      customerName: body.customerName,
+      currency: body.currency || 'USD',
       inventoryTransactions: inventoryResult.transactions,
       stockUpdates: inventoryResult.stockUpdates,
-      inventorySummary: inventoryResult.summary
+      inventorySummary: inventoryResult.summary,
+      crmInvoice: crmResult ? {
+        success: crmResult.success,
+        invoice_id: crmResult.invoice_id,
+        invoice_number: crmResult.invoice_number,
+        error: crmResult.error
+      } : null
     }
     
     // Log the sale for audit purposes
@@ -87,20 +136,46 @@ export async function POST(request: NextRequest) {
       total: body.total,
       paymentMethod: body.paymentMethod,
       user: body.user,
-      inventoryUpdates: inventoryResult.summary
+      customerId: body.customerId,
+      inventoryUpdates: inventoryResult.summary,
+      crmInvoice: crmResult ? {
+        success: crmResult.success,
+        invoice_number: crmResult.invoice_number,
+        serviceAvailable: crmResult.crmServiceAvailable
+      } : 'No customer selected'
     })
     
-    // Determine sale success based on inventory service availability
+    // Determine sale success based on inventory and CRM service availability
     const saleSuccess = true // Sale always succeeds from POS perspective
     let message = 'Sale completed successfully'
     let status = 200
+    const warnings = []
     
+    // Check inventory status
     if (!inventoryResult.inventoryServiceAvailable) {
-      message = 'Sale completed successfully (inventory service unavailable - manual stock adjustment may be required)'
+      warnings.push('inventory service unavailable - manual stock adjustment may be required')
       status = 207 // Multi-Status to indicate partial success
     } else if (!inventoryResult.success) {
-      message = `Sale completed successfully (${inventoryResult.summary.failed_updates} inventory updates failed)`
+      warnings.push(`${inventoryResult.summary.failed_updates} inventory updates failed`)
       status = 207
+    }
+    
+    // Check CRM status if customer was selected
+    if (body.customerId && crmResult) {
+      if (!crmResult.crmServiceAvailable) {
+        warnings.push('CRM service unavailable - invoice not created')
+        status = 207
+      } else if (!crmResult.success) {
+        warnings.push('CRM invoice creation failed')
+        status = 207
+      }
+    }
+    
+    // Build final message
+    if (warnings.length > 0) {
+      message = `Sale completed successfully (${warnings.join(', ')})`
+    } else if (body.customerId && crmResult?.success) {
+      message = `Sale completed successfully with inventory updates and CRM invoice ${crmResult.invoice_number}`
     } else {
       message = 'Sale completed successfully with all inventory updates'
     }
@@ -115,10 +190,20 @@ export async function POST(request: NextRequest) {
         updatesSuccessful: inventoryResult.success,
         summary: inventoryResult.summary
       },
-      ...(inventoryResult.summary.failed_updates > 0 && {
-        warnings: inventoryResult.stockUpdates
-          .filter(update => !update.success)
-          .map(update => `Inventory update failed for item ${update.item_id}: ${update.error}`)
+      crmStatus: crmResult ? {
+        serviceAvailable: crmResult.crmServiceAvailable,
+        invoiceCreated: crmResult.success,
+        invoice_id: crmResult.invoice_id,
+        invoice_number: crmResult.invoice_number,
+        error: crmResult.error
+      } : null,
+      ...(warnings.length > 0 && {
+        warnings: [
+          ...inventoryResult.stockUpdates
+            .filter(update => !update.success)
+            .map(update => `Inventory update failed for item ${update.item_id}: ${update.error}`),
+          ...(crmResult && !crmResult.success ? [`CRM invoice creation failed: ${crmResult.error}`] : [])
+        ]
       })
     }, { status })
     
