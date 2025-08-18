@@ -92,6 +92,9 @@ interface DisplayItem {
   description?: string
   duration?: number
   unit?: string
+  taxRate?: number
+  taxExempt?: boolean
+  taxCategory?: string
 }
 
 interface CartItem {
@@ -237,7 +240,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       type: item.type,
       description: item.description,
       duration: item.duration,
-      unit: item.unit
+      unit: item.unit,
+      // Include tax information
+      taxRate: item.taxRate || 0,
+      taxExempt: item.taxExempt || false,
+      taxCategory: item.taxCategory || 'standard'
     }
     
     addItem(cartItem)
@@ -324,7 +331,11 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       image: product.image,
       stock: product.stock,
       barcode: product.barcode,
-      type: 'product' as const
+      type: 'product' as const,
+      // Include tax information from product
+      taxRate: product.taxRate || 0,
+      taxExempt: product.taxExempt || false,
+      taxCategory: product.taxCategory || 'standard'
     }))
     
     // Transform services to DisplayItem format

@@ -95,7 +95,7 @@ export const useCartStore = create<CartState>()(
             image: product.image,
             category: product.category,
             discount: 0,
-            taxRate: product.taxExempt ? 0 : (product.taxRate || 0.08), // Use product tax rate or default 8%
+            taxRate: product.taxExempt ? 0 : (product.taxRate || 0), // Use product tax rate, no default
             cost: product.cost || 0 // Capture cost price for reporting
           }
           set({ items: [...items, newItem] })

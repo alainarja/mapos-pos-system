@@ -637,7 +637,11 @@ export const useInventoryStore = create<InventoryState>()(
             isFeatured: false,
             isNew: false,
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            // Tax fields from inventory API
+            taxRate: item.tax_rate || item.taxRate || item.vat_rate || 0, // Get tax rate from API, default to 0 (no tax)
+            taxExempt: item.tax_exempt || item.taxExempt || false,
+            taxCategory: item.tax_category || item.taxCategory || 'standard'
           }))
           
           console.log('📦 Found', apiData.data?.length || 0, 'products')
@@ -735,7 +739,11 @@ export const useInventoryStore = create<InventoryState>()(
             isFeatured: false,
             isNew: false,
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            // Tax fields from inventory API
+            taxRate: item.tax_rate || item.taxRate || item.vat_rate || 0, // Get tax rate from API, default to 0 (no tax)
+            taxExempt: item.tax_exempt || item.taxExempt || false,
+            taxCategory: item.tax_category || item.taxCategory || 'standard'
           }))
           
           set({ products })
