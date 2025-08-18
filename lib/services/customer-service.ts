@@ -262,7 +262,7 @@ class CustomerService {
   /**
    * Validate email format
    */
-  static isValidEmail(email: string): boolean {
+  isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
   }
@@ -270,7 +270,7 @@ class CustomerService {
   /**
    * Validate phone format (basic validation)
    */
-  static isValidPhone(phone: string): boolean {
+  isValidPhone(phone: string): boolean {
     const phoneRegex = /^[\d\s\-\+\(\)]{10,}$/
     return phoneRegex.test(phone)
   }
