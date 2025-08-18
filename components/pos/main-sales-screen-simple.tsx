@@ -55,7 +55,6 @@ import { CouponInput } from "@/components/pos/coupon-input"
 import { ReturnsExchange } from "@/components/pos/returns-exchange"
 import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration"
 import { CashCountDialog } from "@/components/cash/cash-count-dialog"
-import { TaxBreakdown, InlineTaxDisplay } from "@/components/ui/tax-breakdown"
 import { CustomerSelector } from "@/components/pos/customer-selector"
 
 interface Product {
@@ -1713,11 +1712,6 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
               <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
                 Cart
               </h2>
-              {cart.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Tip: Shift+Click ❌ to void with audit trail
-                </p>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -1811,15 +1805,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                           <DollarSign className="h-3 w-3" />
                         </SoundButton>
                         <SoundButton
-                          onClick={(e) => {
-                            // Shift+click or Alt+click for void with audit trail
-                            if (e.shiftKey || e.altKey) {
-                              initiateVoid(item.id)
-                            } else {
-                              // Simple remove
-                              removeFromCart(item.id)
-                            }
-                          }}
+                          onClick={() => removeFromCart(item.id)}
                           variant="ghost"
                           size="sm"
                           soundType="click"
@@ -1888,9 +1874,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                     </div>
                   )}
                   <div className="flex justify-between text-sm font-medium">
-                    <span className="text-slate-600">
-                      <InlineTaxDisplay items={cart} />
-                    </span>
+                    <span className="text-slate-600">Tax</span>
                     <span className="text-slate-800">${tax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t border-purple-200">
@@ -1900,31 +1884,8 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 </div>
 
                 {/* Tax Breakdown */}
-                {cart.length > 0 && (
-                  <div className="pt-4">
-                    <TaxBreakdown items={cart} className="text-xs" />
-                  </div>
-                )}
 
                 {/* Store Information */}
-                {/* Store Display (loaded on login) */}
-                {currentStore && (
-                  <div className="pt-4 border-t border-purple-200/30">
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Store Location</label>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium text-green-900 text-sm">{currentStore.name}</p>
-                          <p className="text-xs text-green-700">{currentStore.code}</p>
-                          <p className="text-xs text-green-600">{currentStore.warehouseName}</p>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          Active
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Customer Selection */}
                 <div className="pt-4 border-t border-purple-200/30">
@@ -3363,9 +3324,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                             <span className="font-semibold text-gray-800">${subtotal.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-xl">
-                            <span className="font-medium text-gray-700">
-                              <InlineTaxDisplay items={cart} />:
-                            </span>
+                            <span className="font-medium text-gray-700">Tax:</span>
                             <span className="font-semibold text-gray-800">${tax.toFixed(2)}</span>
                           </div>
                           {totalSavings > 0 && (
