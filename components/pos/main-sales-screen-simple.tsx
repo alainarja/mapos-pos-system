@@ -257,12 +257,14 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       return
     }
 
-    addExpense({
+    const expenseData = {
       description: expenseDescription.trim(),
       amount: parseFloat(expenseAmount),
       category: expenseCategory,
       cashier: user || 'Unknown'
-    })
+    }
+
+    addExpense(expenseData)
 
     setExpenseDescription('')
     setExpenseAmount('')
@@ -275,7 +277,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       id: Date.now().toString(),
       type: 'success',
       title: 'Expense Added',
-      message: `${newExpense.description}: $${newExpense.amount.toFixed(2)}`,
+      message: `${expenseData.description}: $${expenseData.amount.toFixed(2)}`,
       timestamp: new Date(),
       isRead: false,
       duration: 3000
