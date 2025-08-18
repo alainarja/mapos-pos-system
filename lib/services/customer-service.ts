@@ -139,7 +139,7 @@ class CustomerService {
       }>(`/api/external/customers?${searchParams.toString()}`)
 
       // Convert CRM customers to our Customer format
-      const customers: Customer[] = result.data.map(this.convertCrmCustomerToLocal)
+      const customers: Customer[] = result.data.map((customer) => this.convertCrmCustomerToLocal(customer))
 
       return {
         data: customers,

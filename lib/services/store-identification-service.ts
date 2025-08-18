@@ -141,7 +141,7 @@ class StoreIdentificationService {
 
       const response = await this.makeRequest<InventoryApiStoreResponse>('/api/external/stores')
       
-      const stores = response.stores?.map(this.convertApiStoreToStoreLocation) || [this.getDefaultStore()]
+      const stores = response.stores?.map((store: any) => this.convertApiStoreToStoreLocation(store)) || [this.getDefaultStore()]
       
       // Cache the result
       this.cachedStores = stores
