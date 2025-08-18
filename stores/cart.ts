@@ -560,7 +560,7 @@ export const useCartStore = create<CartState>()(
           
           // Get store metadata
           const storeMetadata = state.currentStore ? 
-            await storeIdentificationService.generateTransactionMetadata() : null
+            storeIdentificationService.getTransactionMetadata(state.currentStore) : null
 
           // Prepare sale transaction data
           const saleTransaction = {
