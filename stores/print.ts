@@ -108,6 +108,7 @@ interface PrintStore {
   printDailyReport: () => Promise<boolean>
   printXReport: () => Promise<boolean>
   printZReport: () => Promise<boolean>
+  printEndOfDayReport: (reportData: any) => Promise<boolean>
   printTransaction: (transactionId: string) => Promise<boolean>
   updatePrintOptions: (options: Partial<PrintOptions>) => void
   updateAutoPrintSettings: (settings: Partial<AutoPrintSettings>) => void
@@ -415,6 +416,30 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
       return true
     } catch (error) {
       console.error('Print Z-Report error:', error)
+      set({ printerStatus: 'error' })
+      return false
+    }
+  },
+
+  printEndOfDayReport: async (reportData) => {
+    try {
+      set({ printerStatus: 'busy' })
+      
+      const reportContent = get().formatEndOfDayReportForPrint(reportData)
+      
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        printWindow.document.write(reportContent)
+        printWindow.document.close()
+        printWindow.focus()
+        printWindow.print()
+        printWindow.close()
+      }
+      
+      set({ printerStatus: 'ready' })
+      return true
+    } catch (error) {
+      console.error('Print End-of-Day Report error:', error)
       set({ printerStatus: 'error' })
       return false
     }
@@ -913,6 +938,203 @@ export const usePrintStore = create<PrintStore>((set, get) => ({
           <div class="section">
             <p><strong>*** END OF BUSINESS DAY ***</strong></p>
             <p>This report closes the current business day.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  },
+
+  formatEndOfDayReportForPrint: (reportData: any) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>End of Day Report</title>
+        <style>
+          body { 
+            font-family: 'Courier New', monospace; 
+            margin: 20px; 
+            font-size: 12px; 
+            line-height: 1.4;
+          }
+          .report { max-width: 600px; margin: 0 auto; }
+          .header { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            border-bottom: 2px solid #000; 
+            padding-bottom: 10px;
+          }
+          .section { margin: 20px 0; border-bottom: 1px solid #ccc; padding-bottom: 15px; }
+          .line { display: flex; justify-content: space-between; margin: 3px 0; }
+          .total { font-weight: bold; border-top: 1px solid #000; padding-top: 5px; margin-top: 10px; }
+          .subtitle { font-weight: bold; margin: 10px 0 5px 0; color: #333; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+          .cash-section { background: #f5f5f5; padding: 10px; border: 1px solid #ddd; }
+          .variance-ok { color: #008000; }
+          .variance-error { color: #dc3545; font-weight: bold; }
+          @media print {
+            body { margin: 10px; font-size: 10px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="report">
+          <div class="header">
+            <h2>MAPOS END OF DAY REPORT</h2>
+            <p><strong>Date: ${new Date(reportData.date).toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</strong></p>
+            <p>Generated: ${new Date(reportData.generatedAt).toLocaleString()}</p>
+            <p>Prepared by: ${reportData.generatedBy}</p>
+          </div>
+          
+          <div class="section">
+            <h3>SALES SUMMARY</h3>
+            <div class="line">
+              <span>Total Transactions:</span>
+              <span>${reportData.totalTransactions}</span>
+            </div>
+            <div class="line">
+              <span>Gross Sales:</span>
+              <span>$${(reportData.totalRevenue + reportData.totalDiscount).toFixed(2)}</span>
+            </div>
+            <div class="line">
+              <span>Total Discounts:</span>
+              <span>-$${reportData.totalDiscount.toFixed(2)}</span>
+            </div>
+            <div class="line">
+              <span>Net Sales:</span>
+              <span>$${reportData.netSales.toFixed(2)}</span>
+            </div>
+            <div class="line">
+              <span>Tax Collected:</span>
+              <span>$${reportData.totalTax.toFixed(2)}</span>
+            </div>
+            <div class="line total">
+              <span>TOTAL REVENUE:</span>
+              <span>$${reportData.totalRevenue.toFixed(2)}</span>
+            </div>
+            <div class="line">
+              <span>Average Transaction:</span>
+              <span>$${reportData.averageTransaction.toFixed(2)}</span>
+            </div>
+            ${reportData.refundsCount > 0 ? `
+            <div class="line" style="color: #dc3545;">
+              <span>Refunds (${reportData.refundsCount}):</span>
+              <span>-$${reportData.refundsAmount.toFixed(2)}</span>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="section">
+            <h3>PAYMENT METHOD BREAKDOWN</h3>
+            ${Object.entries(reportData.paymentMethodBreakdown).map(([method, data]: [string, any]) => `
+              <div class="line">
+                <span>${method} (${data.count} trans):</span>
+                <span>$${data.amount.toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          ${reportData.cashReconciliation ? `
+          <div class="section cash-section">
+            <h3>CASH RECONCILIATION</h3>
+            <div class="line">
+              <span>Expected Cash:</span>
+              <span>$${reportData.cashReconciliation.expectedCash.toFixed(2)}</span>
+            </div>
+            ${reportData.cashReconciliation.actualCash !== null ? `
+              <div class="line">
+                <span>Actual Cash Count:</span>
+                <span>$${reportData.cashReconciliation.actualCash.toFixed(2)}</span>
+              </div>
+              <div class="line total ${reportData.cashReconciliation.variance === 0 ? 'variance-ok' : 'variance-error'}">
+                <span>Variance:</span>
+                <span>${reportData.cashReconciliation.variance === 0 ? 'BALANCED' : 
+                  (reportData.cashReconciliation.variance > 0 ? '+' : '') + 
+                  '$' + reportData.cashReconciliation.variance.toFixed(2)}</span>
+              </div>
+              ${Math.abs(reportData.cashReconciliation.variance) > 0.01 ? `
+                <div style="color: #dc3545; font-weight: bold; text-align: center; margin-top: 10px;">
+                  ⚠️ CASH VARIANCE REQUIRES MANAGER ATTENTION ⚠️
+                </div>
+              ` : `
+                <div style="color: #008000; font-weight: bold; text-align: center; margin-top: 10px;">
+                  ✓ CASH DRAWER BALANCED
+                </div>
+              `}
+            ` : `
+              <div style="color: #ffc107; text-align: center; margin-top: 10px;">
+                CASH COUNT NOT COMPLETED
+              </div>
+            `}
+          </div>
+          ` : ''}
+
+          <div class="section">
+            <h3>TOP SELLING ITEMS</h3>
+            ${reportData.topItems.slice(0, 10).map((item: any, index: number) => `
+              <div class="line">
+                <span>${index + 1}. ${item.name} (×${item.quantity}):</span>
+                <span>$${item.revenue.toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h3>CASHIER PERFORMANCE</h3>
+            ${reportData.cashierPerformance.map((cashier: any) => `
+              <div class="line">
+                <span>${cashier.cashier} (${cashier.count} trans):</span>
+                <span>$${cashier.amount.toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          ${reportData.hourlyBreakdown.length > 0 ? `
+          <div class="section">
+            <h3>HOURLY SALES BREAKDOWN</h3>
+            <div class="grid">
+              ${reportData.hourlyBreakdown.map((hour: any) => `
+                <div class="line">
+                  <span>${hour.hour}:</span>
+                  <span>$${hour.amount.toFixed(2)} (${hour.count})</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="section">
+            <h3>SIGNATURES</h3>
+            <div style="margin: 30px 0;">
+              <div style="border-top: 1px solid #000; width: 200px; display: inline-block; margin: 10px 20px;">
+                <p style="text-align: center; margin: 5px 0; font-size: 10px;">CASHIER SIGNATURE</p>
+              </div>
+              <div style="border-top: 1px solid #000; width: 200px; display: inline-block; margin: 10px 20px;">
+                <p style="text-align: center; margin: 5px 0; font-size: 10px;">MANAGER SIGNATURE</p>
+              </div>
+            </div>
+            <div style="margin: 20px 0;">
+              <div style="border-top: 1px solid #000; width: 100px; display: inline-block; margin: 10px 20px;">
+                <p style="text-align: center; margin: 5px 0; font-size: 10px;">DATE</p>
+              </div>
+              <div style="border-top: 1px solid #000; width: 100px; display: inline-block; margin: 10px 20px;">
+                <p style="text-align: center; margin: 5px 0; font-size: 10px;">TIME</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div style="text-align: center; font-weight: bold;">
+              <p>*** END OF BUSINESS DAY ***</p>
+              <p>This report closes the current business day.</p>
+              <p>System Date: ${new Date().toLocaleString()}</p>
+            </div>
           </div>
         </div>
       </body>

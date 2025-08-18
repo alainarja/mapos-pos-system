@@ -39,6 +39,8 @@ import {
   Edit3,
   Check,
   Move,
+  RefreshCw,
+  ArrowRightLeft,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -2254,74 +2256,38 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
                 className="w-full justify-start" 
                 variant="outline"
                 onClick={() => {
-                  const endOfDayReport = {
-                    id: 'EOD-' + Date.now(),
-                    timestamp: new Date(),
-                    items: [],
-                    subtotal: transactionHistory.reduce((sum, t) => sum + t.subtotal, 0),
-                    discount: transactionHistory.reduce((sum, t) => sum + t.discount, 0),
-                    tax: transactionHistory.reduce((sum, t) => sum + t.tax, 0),
-                    total: transactionHistory.reduce((sum, t) => sum + t.total, 0),
-                    paymentMethod: 'End of Day Report',
-                    referral: null,
-                    transactionCount: transactionHistory.length
-                  }
-                  
-                  const reportWindow = window.open('', '_blank', 'width=500,height=700')
-                  if (reportWindow) {
-                    reportWindow.document.write(`
-                      <html>
-                        <head>
-                          <title>End of Day Report</title>
-                          <style>
-                            body { font-family: Arial, sans-serif; padding: 20px; }
-                            h1 { text-align: center; }
-                            .stat { margin: 10px 0; display: flex; justify-between; }
-                            .divider { border-top: 2px solid #333; margin: 20px 0; }
-                          </style>
-                        </head>
-                        <body>
-                          <h1>End of Day Report</h1>
-                          <p style="text-align: center;">${new Date().toLocaleDateString()}</p>
-                          <div class="divider"></div>
-                          <div class="stat">
-                            <span>Total Transactions:</span>
-                            <strong>${transactionHistory.length}</strong>
-                          </div>
-                          <div class="stat">
-                            <span>Total Sales:</span>
-                            <strong>$${transactionHistory.reduce((sum, t) => sum + t.total, 0).toFixed(2)}</strong>
-                          </div>
-                          <div class="stat">
-                            <span>Total Discounts:</span>
-                            <strong>$${transactionHistory.reduce((sum, t) => sum + t.discount, 0).toFixed(2)}</strong>
-                          </div>
-                          <div class="stat">
-                            <span>Total Tax:</span>
-                            <strong>$${transactionHistory.reduce((sum, t) => sum + t.tax, 0).toFixed(2)}</strong>
-                          </div>
-                          <div class="divider"></div>
-                          <h3>Transaction Details:</h3>
-                          ${transactionHistory.map(t => `
-                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd;">
-                              <div>#${t.id} - ${new Date(t.timestamp).toLocaleTimeString()}</div>
-                              <div>Amount: $${t.total.toFixed(2)} (${t.paymentMethod})</div>
-                            </div>
-                          `).join('')}
-                        </body>
-                      </html>
-                    `)
-                    reportWindow.document.close()
-                    reportWindow.print()
-                  }
+                  // Open comprehensive end-of-day report in new tab
+                  window.open('/reports/end-of-day', '_blank', 'width=1200,height=800')
                 }}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
-                Print End of Day Report
+                End of Day Report
               </Button>
               <Button className="w-full justify-start" variant="outline">
                 <DollarSign className="h-4 w-4 mr-2" />
                 Print Cash Drawer Report
+              </Button>
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => {
+                  // Open exchanges page in new tab
+                  window.open('/exchanges', '_blank', 'width=1200,height=800')
+                }}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Exchanges
+              </Button>
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => {
+                  // Open refund lookup in new tab
+                  window.open('/refunds', '_blank', 'width=1200,height=800')
+                }}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refunds
               </Button>
             </div>
           </div>

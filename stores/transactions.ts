@@ -46,6 +46,42 @@ interface TransactionStore {
     thisMonth: number
     averageAmount: number
   }
+  
+  // End-of-Day specific functions
+  getDailyReport: (date?: string) => {
+    date: string
+    totalTransactions: number
+    totalRevenue: number
+    totalTax: number
+    totalDiscount: number
+    netSales: number
+    paymentMethodBreakdown: Record<string, { count: number; amount: number }>
+    topItems: Array<{ name: string; quantity: number; revenue: number }>
+    hourlyBreakdown: Array<{ hour: string; count: number; amount: number }>
+    refundsCount: number
+    refundsAmount: number
+    averageTransaction: number
+    cashierPerformance: Array<{ cashier: string; count: number; amount: number }>
+  }
+  getShiftSummary: (startTime: string, endTime: string, cashier?: string) => {
+    startTime: string
+    endTime: string
+    cashier: string | null
+    transactions: Transaction[]
+    totalRevenue: number
+    transactionCount: number
+    averageTransaction: number
+    paymentMethods: Record<string, number>
+  }
+  getCashReconciliation: (date?: string) => {
+    date: string
+    expectedCash: number
+    actualCash: number | null
+    variance: number | null
+    cashTransactions: Transaction[]
+    cashSales: number
+    cashRefunds: number
+  }
 }
 
 // Generate a unique transaction ID
@@ -348,6 +384,162 @@ export const useTransactionStore = create<TransactionStore>()(
           thisWeek: weekTransactions.length,
           thisMonth: monthTransactions.length,
           averageAmount: Math.round(averageAmount * 100) / 100
+        }
+      },
+
+      // End-of-Day specific functions
+      getDailyReport: (date) => {
+        const reportDate = date || new Date().toISOString().split('T')[0]
+        const dayTransactions = get().transactions.filter(t => t.date === reportDate)
+        const completedTransactions = dayTransactions.filter(t => t.status === 'completed')
+        const refundTransactions = dayTransactions.filter(t => t.status === 'refunded')
+        
+        // Basic totals
+        const totalRevenue = completedTransactions.reduce((sum, t) => sum + t.total, 0)
+        const totalTax = completedTransactions.reduce((sum, t) => sum + t.tax, 0)
+        const totalDiscount = completedTransactions.reduce((sum, t) => sum + t.discount, 0)
+        const netSales = totalRevenue - totalDiscount
+        const refundsAmount = Math.abs(refundTransactions.reduce((sum, t) => sum + t.total, 0))
+        
+        // Payment method breakdown
+        const paymentMethodBreakdown: Record<string, { count: number; amount: number }> = {}
+        completedTransactions.forEach(t => {
+          if (!paymentMethodBreakdown[t.paymentMethod]) {
+            paymentMethodBreakdown[t.paymentMethod] = { count: 0, amount: 0 }
+          }
+          paymentMethodBreakdown[t.paymentMethod].count += 1
+          paymentMethodBreakdown[t.paymentMethod].amount += t.total
+        })
+        
+        // Top items
+        const itemSales: Record<string, { quantity: number; revenue: number }> = {}
+        completedTransactions.forEach(t => {
+          t.items.forEach(item => {
+            if (!itemSales[item.name]) {
+              itemSales[item.name] = { quantity: 0, revenue: 0 }
+            }
+            itemSales[item.name].quantity += item.quantity
+            itemSales[item.name].revenue += item.price * item.quantity
+          })
+        })
+        const topItems = Object.entries(itemSales)
+          .map(([name, data]) => ({ name, ...data }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 10)
+        
+        // Hourly breakdown
+        const hourlyData: Record<string, { count: number; amount: number }> = {}
+        for (let i = 0; i < 24; i++) {
+          const hour = i.toString().padStart(2, '0') + ':00'
+          hourlyData[hour] = { count: 0, amount: 0 }
+        }
+        
+        completedTransactions.forEach(t => {
+          const hour = t.time.split(':')[0] + ':00'
+          if (hourlyData[hour]) {
+            hourlyData[hour].count += 1
+            hourlyData[hour].amount += t.total
+          }
+        })
+        
+        const hourlyBreakdown = Object.entries(hourlyData)
+          .map(([hour, data]) => ({ hour, ...data }))
+          .filter(entry => entry.count > 0)
+        
+        // Cashier performance
+        const cashierData: Record<string, { count: number; amount: number }> = {}
+        completedTransactions.forEach(t => {
+          if (!cashierData[t.cashier]) {
+            cashierData[t.cashier] = { count: 0, amount: 0 }
+          }
+          cashierData[t.cashier].count += 1
+          cashierData[t.cashier].amount += t.total
+        })
+        
+        const cashierPerformance = Object.entries(cashierData)
+          .map(([cashier, data]) => ({ cashier, ...data }))
+          .sort((a, b) => b.amount - a.amount)
+        
+        return {
+          date: reportDate,
+          totalTransactions: completedTransactions.length,
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          totalTax: Math.round(totalTax * 100) / 100,
+          totalDiscount: Math.round(totalDiscount * 100) / 100,
+          netSales: Math.round(netSales * 100) / 100,
+          paymentMethodBreakdown,
+          topItems,
+          hourlyBreakdown,
+          refundsCount: refundTransactions.length,
+          refundsAmount: Math.round(refundsAmount * 100) / 100,
+          averageTransaction: completedTransactions.length > 0 ? Math.round((totalRevenue / completedTransactions.length) * 100) / 100 : 0,
+          cashierPerformance
+        }
+      },
+      
+      getShiftSummary: (startTime, endTime, cashier) => {
+        const shiftTransactions = get().transactions.filter(t => {
+          const transactionDateTime = new Date(`${t.date} ${t.time}`)
+          const shiftStart = new Date(startTime)
+          const shiftEnd = new Date(endTime)
+          
+          const matchesCashier = !cashier || t.cashier === cashier
+          const inTimeRange = transactionDateTime >= shiftStart && transactionDateTime <= shiftEnd
+          
+          return matchesCashier && inTimeRange && t.status === 'completed'
+        })
+        
+        const totalRevenue = shiftTransactions.reduce((sum, t) => sum + t.total, 0)
+        const averageTransaction = shiftTransactions.length > 0 ? totalRevenue / shiftTransactions.length : 0
+        
+        // Payment method breakdown for shift
+        const paymentMethods: Record<string, number> = {}
+        shiftTransactions.forEach(t => {
+          paymentMethods[t.paymentMethod] = (paymentMethods[t.paymentMethod] || 0) + t.total
+        })
+        
+        return {
+          startTime,
+          endTime,
+          cashier: cashier || null,
+          transactions: shiftTransactions,
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          transactionCount: shiftTransactions.length,
+          averageTransaction: Math.round(averageTransaction * 100) / 100,
+          paymentMethods
+        }
+      },
+      
+      getCashReconciliation: (date) => {
+        const reconciliationDate = date || new Date().toISOString().split('T')[0]
+        const cashTransactions = get().transactions.filter(t => 
+          t.date === reconciliationDate && 
+          t.paymentMethod === 'Cash' && 
+          t.status === 'completed'
+        )
+        
+        const cashRefunds = get().transactions.filter(t =>
+          t.date === reconciliationDate &&
+          t.paymentMethod === 'Cash' &&
+          t.status === 'refunded' &&
+          t.total < 0
+        )
+        
+        const cashSales = cashTransactions.reduce((sum, t) => sum + t.total, 0)
+        const cashRefundsAmount = Math.abs(cashRefunds.reduce((sum, t) => sum + t.total, 0))
+        const expectedCash = cashSales - cashRefundsAmount
+        
+        // actualCash would be set by the cashier during end-of-day process
+        // variance would be calculated when actualCash is provided
+        
+        return {
+          date: reconciliationDate,
+          expectedCash: Math.round(expectedCash * 100) / 100,
+          actualCash: null, // To be filled during cash counting
+          variance: null, // To be calculated when actualCash is provided
+          cashTransactions,
+          cashSales: Math.round(cashSales * 100) / 100,
+          cashRefunds: Math.round(cashRefundsAmount * 100) / 100
         }
       }
     }),

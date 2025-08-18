@@ -52,7 +52,7 @@ class CrmIntegrationService {
     
     // Create abort controller for timeout
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000) // 20 second timeout
     
     try {
       const response = await fetch(url, {
@@ -76,7 +76,7 @@ class CrmIntegrationService {
     } catch (error) {
       clearTimeout(timeoutId)
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('CRM service timeout - request took longer than 10 seconds')
+        throw new Error('CRM service timeout - request took longer than 20 seconds')
       }
       throw error
     }
@@ -213,6 +213,117 @@ class CrmIntegrationService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Connection failed'
+      }
+    }
+  }
+
+  /**
+   * Public method to check if CRM integration is properly configured
+   */
+  isConfigured(): boolean {
+    return !!(this.config.baseUrl && this.config.apiKey)
+  }
+
+  /**
+   * Public method to make arbitrary CRM API requests (for refund system)
+   */
+  async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    // Check if CRM service is configured
+    if (!this.config.baseUrl || !this.config.apiKey) {
+      throw new Error('CRM service not configured - missing base URL or API key')
+    }
+
+    const url = `${this.config.baseUrl}${endpoint}`
+    
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 20000) // 20 second timeout
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.config.apiKey,
+          ...options.headers
+        }
+      })
+
+      clearTimeout(timeoutId)
+      return response
+
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('CRM service timeout - request took longer than 20 seconds')
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Search CRM invoices for refund processing
+   */
+  async searchInvoices(params: {
+    customer?: string
+    search?: string
+    status?: string
+    perPage?: number
+    page?: number
+  }): Promise<{
+    data: any[]
+    pagination: any
+  }> {
+    const searchParams = new URLSearchParams()
+    
+    if (params.customer) searchParams.append('customer', params.customer)
+    if (params.search) searchParams.append('search', params.search)
+    if (params.status) searchParams.append('status', params.status)
+    if (params.perPage) searchParams.append('perPage', params.perPage.toString())
+    if (params.page) searchParams.append('page', params.page.toString())
+
+    const response = await this.makeRequest(`/api/external/invoices?${searchParams.toString()}`, {
+      method: 'GET'
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`CRM search failed: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Create a refund invoice in CRM
+   */
+  async createRefundInvoice(refundData: CrmInvoice): Promise<CrmInvoiceResult> {
+    try {
+      const response = await this.makeRequest('/api/external/invoices', {
+        method: 'POST',
+        body: JSON.stringify(refundData)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`CRM refund creation failed: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+
+      const result = await response.json()
+      
+      return {
+        success: result.success || false,
+        invoice_id: result.invoice_id,
+        invoice_number: result.invoice_number,
+        error: result.error
+      }
+
+    } catch (error) {
+      console.error('CRM refund creation failed:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
