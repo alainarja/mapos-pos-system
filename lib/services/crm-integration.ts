@@ -39,8 +39,8 @@ class CrmIntegrationService {
 
   constructor() {
     this.config = {
-      baseUrl: process.env.CRM_API_URL || '',
-      apiKey: process.env.CRM_API_KEY || ''
+      baseUrl: process.env.NEXT_PUBLIC_CRM_API_URL || process.env.CRM_API_URL || '',
+      apiKey: process.env.NEXT_PUBLIC_CRM_API_KEY || process.env.CRM_API_KEY || ''
     }
   }
 
