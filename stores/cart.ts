@@ -587,15 +587,18 @@ export const useCartStore = create<CartState>()(
           const storeMetadata = state.currentStore ? 
             storeIdentificationService.getTransactionMetadata(state.currentStore) : null
           
-          // Get warehouse ID from currentStore (it's nested in warehouse object)
+          // IMPORTANT: Always prioritize the passed warehouse ID from authenticated user
           const storeWarehouseId = state.currentStore?.warehouse?.warehouseId
-          const finalWarehouseId = warehouseId || storeWarehouseId
+          const finalWarehouseId = warehouseId && warehouseId !== 'undefined' && warehouseId !== 'null' 
+            ? warehouseId 
+            : storeWarehouseId || 'WH1'
           
           console.log('=== SALE WAREHOUSE INFO ===')
           console.log('Current Store:', state.currentStore)
           console.log('Store Warehouse ID:', storeWarehouseId)
-          console.log('Passed Warehouse ID:', warehouseId)
-          console.log('Final Warehouse ID:', finalWarehouseId)
+          console.log('Passed Warehouse ID (from user):', warehouseId)
+          console.log('Passed Warehouse ID type:', typeof warehouseId)
+          console.log('Final Warehouse ID being used:', finalWarehouseId)
 
           // Get default customer from settings if no customer selected
           // Import settings store dynamically to avoid circular dependency

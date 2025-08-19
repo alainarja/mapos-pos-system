@@ -25,24 +25,17 @@ export default function HomePage() {
       
       // Log user data to check for warehouse info
       console.log('=== LOGIN SUCCESSFUL ===')
+      console.log('Full response:', response)
       console.log('User data received:', response.user)
-      console.log('Warehouse/Store info in user:', {
-        warehouseId: (response.user as any)?.warehouseId,
-        warehouse: (response.user as any)?.warehouse,
-        storeId: (response.user as any)?.storeId,
-        store: (response.user as any)?.store,
-        location: (response.user as any)?.location
+      console.log('Warehouse data in user:', {
+        warehouseId: response.user.warehouseId,
+        warehouseName: response.user.warehouseName,
+        locationId: response.user.locationId,
+        locationName: response.user.locationName
       })
       
-      // TEMPORARY: Add default warehouse to user if not provided by maposusers
-      // This ensures invoices have warehouse prefix until maposusers is updated
-      const userWithWarehouse = {
-        ...response.user,
-        warehouseId: (response.user as any)?.warehouseId || 'WH1',
-        warehouseName: (response.user as any)?.warehouseName || 'Main Warehouse'
-      }
-      
-      setUser(userWithWarehouse)
+      // Set user directly from response
+      setUser(response.user)
       setAuthMode("authenticated")
       setLoginError(null)
     } catch (error) {
@@ -60,24 +53,17 @@ export default function HomePage() {
       
       // Log user data to check for warehouse info
       console.log('=== PIN LOGIN SUCCESSFUL ===')
+      console.log('Full response:', response)
       console.log('User data received:', response.user)
-      console.log('Warehouse/Store info in user:', {
-        warehouseId: (response.user as any)?.warehouseId,
-        warehouse: (response.user as any)?.warehouse,
-        storeId: (response.user as any)?.storeId,
-        store: (response.user as any)?.store,
-        location: (response.user as any)?.location
+      console.log('Warehouse data in user:', {
+        warehouseId: response.user.warehouseId,
+        warehouseName: response.user.warehouseName,
+        locationId: response.user.locationId,
+        locationName: response.user.locationName
       })
       
-      // TEMPORARY: Add default warehouse to user if not provided by maposusers
-      // This ensures invoices have warehouse prefix until maposusers is updated
-      const userWithWarehouse = {
-        ...response.user,
-        warehouseId: (response.user as any)?.warehouseId || 'WH1',
-        warehouseName: (response.user as any)?.warehouseName || 'Main Warehouse'
-      }
-      
-      setUser(userWithWarehouse)
+      // Set user directly from response
+      setUser(response.user)
       setAuthMode("authenticated")
       pinLockRef.current?.handleAuthResult(true)
     } catch (error) {
@@ -110,12 +96,13 @@ export default function HomePage() {
   // Log user object before passing to MainSalesScreen
   console.log('=== USER OBJECT BEFORE MAIN SALES SCREEN ===')
   console.log('Full user object:', user)
-  console.log('User warehouseId:', (user as any)?.warehouseId)
+  console.log('User warehouseId:', user?.warehouseId)
+  console.log('User warehouseName:', user?.warehouseName)
   
   return <MainSalesScreen 
     user={user?.fullName || user?.email || 'User'} 
-    userWarehouseId={(user as any)?.warehouseId}
-    userWarehouseName={(user as any)?.warehouseName}
+    userWarehouseId={user?.warehouseId}
+    userWarehouseName={user?.warehouseName}
     onLogout={handleLogout} 
   />
 }
