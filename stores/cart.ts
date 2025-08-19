@@ -493,7 +493,10 @@ export const useCartStore = create<CartState>()(
 
       initializeStore: async () => {
         try {
+          console.log('=== INITIALIZING STORE ===')
           const currentStore = await storeIdentificationService.getCurrentStore()
+          console.log('Store initialized:', currentStore)
+          console.log('Warehouse info:', currentStore?.warehouse)
           set({ currentStore })
         } catch (error) {
           console.error('Failed to initialize store:', error)
@@ -502,7 +505,11 @@ export const useCartStore = create<CartState>()(
 
       setCurrentStore: async (storeId: string) => {
         try {
+          console.log('=== SETTING CURRENT STORE ===')
+          console.log('Store ID:', storeId)
           const store = await storeIdentificationService.setCurrentStore(storeId)
+          console.log('Store set:', store)
+          console.log('Warehouse info:', store?.warehouse)
           set({ currentStore: store })
         } catch (error) {
           console.error('Failed to set current store:', error)
@@ -512,8 +519,11 @@ export const useCartStore = create<CartState>()(
 
       refreshStore: async () => {
         try {
+          console.log('=== REFRESHING STORE ===')
           await storeIdentificationService.refreshStores()
           const currentStore = await storeIdentificationService.getCurrentStore()
+          console.log('Store refreshed:', currentStore)
+          console.log('Warehouse info:', currentStore?.warehouse)
           set({ currentStore })
         } catch (error) {
           console.error('Failed to refresh store data:', error)
@@ -576,7 +586,27 @@ export const useCartStore = create<CartState>()(
           // Get store metadata
           const storeMetadata = state.currentStore ? 
             storeIdentificationService.getTransactionMetadata(state.currentStore) : null
+          
+          // Get warehouse ID from currentStore (it's nested in warehouse object)
+          const storeWarehouseId = state.currentStore?.warehouse?.warehouseId
+          const finalWarehouseId = warehouseId || storeWarehouseId
+          
+          console.log('=== SALE WAREHOUSE INFO ===')
+          console.log('Current Store:', state.currentStore)
+          console.log('Store Warehouse ID:', storeWarehouseId)
+          console.log('Passed Warehouse ID:', warehouseId)
+          console.log('Final Warehouse ID:', finalWarehouseId)
 
+          // Get default customer from settings if no customer selected
+          // Import settings store dynamically to avoid circular dependency
+          const settingsStore = (await import('@/stores/settings')).useSettingsStore.getState()
+          const defaultCustomerId = settingsStore.settings.store.defaultCustomerId || 'WALK-IN'
+          const defaultCustomerName = settingsStore.settings.store.defaultCustomerName || 'Walk-in Customer'
+          
+          // Use selected customer or default
+          const customerId = state.selectedCustomer?.id || defaultCustomerId
+          const customerName = state.selectedCustomer?.name || defaultCustomerName
+          
           // Prepare sale transaction data
           const saleTransaction = {
             items: saleItems,
@@ -585,9 +615,9 @@ export const useCartStore = create<CartState>()(
             total: state.total,
             paymentMethod,
             user,
-            warehouseId: warehouseId || state.currentStore?.warehouseId,
-            customerId: state.selectedCustomer?.id,
-            customerName: state.selectedCustomer?.name,
+            warehouseId: finalWarehouseId,
+            customerId,
+            customerName,
             appliedDiscounts: {
               cartDiscount: state.discount,
               discountInfo: state.discountInfo,
@@ -598,8 +628,8 @@ export const useCartStore = create<CartState>()(
               storeId: state.currentStore.id,
               storeName: state.currentStore.name,
               storeCode: state.currentStore.code,
-              warehouseId: state.currentStore.warehouseId,
-              warehouseName: state.currentStore.warehouseName,
+              warehouseId: state.currentStore.warehouse?.warehouseId,
+              warehouseName: state.currentStore.warehouse?.warehouseName,
               terminalId: storeMetadata?.terminalId,
               deviceId: storeMetadata?.deviceId
             } : null

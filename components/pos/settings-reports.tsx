@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,7 +22,10 @@ import {
   PieChart,
   ShoppingCart,
   Shield,
+  UserCheck,
 } from "lucide-react"
+import { useSettingsStore } from "@/stores/settings"
+import { useCustomerStore } from "@/stores/customer"
 
 interface StoreSettings {
   name: string
@@ -173,6 +176,14 @@ export function SettingsReports() {
   const [userRoles, setUserRoles] = useState<UserRole[]>(sampleUserRoles)
   const [reportData] = useState<ReportData>(sampleReportData)
   const [reportDateRange, setReportDateRange] = useState("today")
+  
+  // Default customer settings
+  const { settings, updateStoreSettings } = useSettingsStore()
+  const { customers, loadCustomers } = useCustomerStore()
+  
+  useEffect(() => {
+    loadCustomers() // Load customers when component mounts
+  }, [])
 
   const updateStoreSetting = (key: keyof StoreSettings, value: any) => {
     setStoreSettings((prev) => ({ ...prev, [key]: value }))
@@ -327,6 +338,76 @@ export function SettingsReports() {
               </div>
 
               <Button className="bg-purple-600 hover:bg-purple-700">Save Settings</Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-slate-800/50 border-purple-500/20">
+            <CardHeader>
+              <CardTitle className="text-purple-300 flex items-center">
+                <UserCheck className="w-5 h-5 mr-2" />
+                Default Customer Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="default-customer" className="text-purple-300">
+                  Default Customer for Walk-in Sales
+                </Label>
+                <Select
+                  value={settings.store.defaultCustomerId || 'WALK-IN'}
+                  onValueChange={(value) => updateStoreSettings({ 
+                    defaultCustomerId: value,
+                    defaultCustomerName: value === 'WALK-IN' 
+                      ? 'Walk-in Customer' 
+                      : customers.find(c => c.id === value)?.name || 'Customer'
+                  })}
+                >
+                  <SelectTrigger className="bg-slate-700/50 border-purple-500/30 text-white">
+                    <SelectValue placeholder="Select default customer" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-purple-500/30">
+                    <SelectItem value="WALK-IN" className="text-white hover:bg-purple-500/20">
+                      Walk-in Customer (Default)
+                    </SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem 
+                        key={customer.id} 
+                        value={customer.id} 
+                        className="text-white hover:bg-purple-500/20"
+                      >
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-purple-400 mt-2">
+                  This customer will be used when no specific customer is selected during checkout
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="create-invoice-all"
+                  checked={settings.store.createInvoiceForAllSales || true}
+                  onCheckedChange={(checked) => updateStoreSettings({ createInvoiceForAllSales: checked })}
+                />
+                <Label htmlFor="create-invoice-all" className="text-purple-300">
+                  Always create invoice in CRM (even for walk-in customers)
+                </Label>
+              </div>
+              
+              <Button 
+                className="bg-purple-600 hover:bg-purple-700"
+                onClick={() => {
+                  console.log('Default customer settings saved:', {
+                    defaultCustomerId: settings.store.defaultCustomerId,
+                    defaultCustomerName: settings.store.defaultCustomerName,
+                    createInvoiceForAllSales: settings.store.createInvoiceForAllSales
+                  })
+                }}
+              >
+                Save Customer Settings
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

@@ -68,19 +68,20 @@ export async function POST(request: NextRequest) {
     }
     
     // Process CRM invoice creation 
-    // Use selected customer or default walk-in customer
+    // Customer info should be provided by client (either selected or default from settings)
     let crmResult = null
-    const customerId = body.customerId || 'WALK-IN'
-    const customerName = body.customerName || 'Walk-in Customer'
+    const customerId = body.customerId
+    const customerName = body.customerName
     
-    // Always create invoice (for selected customer or walk-in)
-    try {
-      console.log('Creating CRM invoice with:', {
-        customerId,
-        customerName,
-        warehouseId: body.warehouseId,
-        total: body.total
-      })
+    // Always create invoice if customer info is provided
+    if (customerId && customerName) {
+      try {
+        console.log('Creating CRM invoice with:', {
+          customerId,
+          customerName,
+          warehouseId: body.warehouseId,
+          total: body.total
+        })
       
       crmResult = await crmIntegration.processPOSSale(
         saleId,
@@ -102,19 +103,22 @@ export async function POST(request: NextRequest) {
         body.warehouseId // Pass warehouse ID for invoice prefix
       )
         
-      console.log('CRM invoice integration result:', {
-        success: crmResult.success,
-        invoice_id: crmResult.invoice_id,
-        invoice_number: crmResult.invoice_number,
-        serviceAvailable: crmResult.crmServiceAvailable
-      })
-    } catch (error) {
-      console.error('CRM integration failed:', error)
-      crmResult = {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        crmServiceAvailable: false
+        console.log('CRM invoice integration result:', {
+          success: crmResult.success,
+          invoice_id: crmResult.invoice_id,
+          invoice_number: crmResult.invoice_number,
+          serviceAvailable: crmResult.crmServiceAvailable
+        })
+      } catch (error) {
+        console.error('CRM integration failed:', error)
+        crmResult = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          crmServiceAvailable: false
+        }
       }
+    } else {
+      console.log('No customer info provided, skipping CRM invoice creation')
     }
     
     // Create sale record

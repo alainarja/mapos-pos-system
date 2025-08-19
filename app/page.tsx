@@ -22,6 +22,18 @@ export default function HomePage() {
     setLoginError(null)
     try {
       const response = await maposUsersAuth.loginWithPassword({ email: username, password })
+      
+      // Log user data to check for warehouse info
+      console.log('=== LOGIN SUCCESSFUL ===')
+      console.log('User data received:', response.user)
+      console.log('Warehouse/Store info in user:', {
+        warehouseId: (response.user as any)?.warehouseId,
+        warehouse: (response.user as any)?.warehouse,
+        storeId: (response.user as any)?.storeId,
+        store: (response.user as any)?.store,
+        location: (response.user as any)?.location
+      })
+      
       setUser(response.user)
       setAuthMode("authenticated")
       setLoginError(null)
