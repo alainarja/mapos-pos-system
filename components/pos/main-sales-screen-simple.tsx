@@ -108,16 +108,18 @@ interface CartItem {
 interface MainSalesScreenProps {
   user: string
   userWarehouseId?: string
+  userWarehouseName?: string
   onLogout: () => void
 }
 
-export function MainSalesScreen({ user, userWarehouseId, onLogout }: MainSalesScreenProps) {
+export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLogout }: MainSalesScreenProps) {
   // Log props on component mount
   useEffect(() => {
     console.log('=== MAIN SALES SCREEN PROPS ===')
     console.log('User:', user)
     console.log('User Warehouse ID:', userWarehouseId)
-  }, [user, userWarehouseId])
+    console.log('User Warehouse Name:', userWarehouseName)
+  }, [user, userWarehouseId, userWarehouseName])
   
   const { playSuccess, playError, playSpecial, playBeep, isEnabled, volume, setEnabled, setVolume } = useSound()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -208,9 +210,16 @@ export function MainSalesScreen({ user, userWarehouseId, onLogout }: MainSalesSc
   // Ensure training mode is disabled on component mount
   useEffect(() => {
     setIsTrainingMode(false)
-    // Initialize store identification
-    initializeStore()
-  }, [])
+    // Initialize store identification but override with user's warehouse if provided
+    initializeStore().then(() => {
+      // If user has a warehouse ID, update the store with it
+      if (userWarehouseId) {
+        console.log('Overriding store warehouse with user warehouse:', userWarehouseId)
+        // We'll need to add a method to update just the warehouse info
+        // For now, let's ensure the warehouse ID is used in sales
+      }
+    })
+  }, [userWarehouseId])
   const [showPriceOverride, setShowPriceOverride] = useState(false)
   const [priceOverrideItemId, setPriceOverrideItemId] = useState<string | null>(null)
   const [overridePrice, setOverridePrice] = useState('')

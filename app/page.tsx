@@ -107,9 +107,15 @@ export default function HomePage() {
     return <PinLock ref={pinLockRef} onUnlock={handlePinUnlock} onBack={() => setAuthMode("login")} />
   }
 
+  // Log user object before passing to MainSalesScreen
+  console.log('=== USER OBJECT BEFORE MAIN SALES SCREEN ===')
+  console.log('Full user object:', user)
+  console.log('User warehouseId:', (user as any)?.warehouseId)
+  
   return <MainSalesScreen 
     user={user?.fullName || user?.email || 'User'} 
     userWarehouseId={(user as any)?.warehouseId}
+    userWarehouseName={(user as any)?.warehouseName}
     onLogout={handleLogout} 
   />
 }
