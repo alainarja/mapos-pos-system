@@ -150,6 +150,9 @@ class CrmIntegrationService {
     }
 
     try {
+      // Log warehouse ID being sent
+      console.log('CRM Integration - Creating invoice with warehouse:', warehouseId)
+      
       // Prepare invoice data
       const invoice: CrmInvoice = {
         customer_id: customerId,
@@ -173,6 +176,8 @@ class CrmIntegrationService {
           cost_price: item.costPrice || 0 // Include cost price for reporting
         }))
       }
+      
+      console.log('Full invoice data being sent to CRM:', JSON.stringify(invoice, null, 2))
 
       const result = await this.createInvoice(invoice)
 

@@ -33,7 +33,11 @@ const defaultSettings: Settings = {
     email: "contact@mapos.com",
     taxRate: 0.08,
     currency: "USD",
-    timezone: "America/New_York"
+    timezone: "America/New_York",
+    // Default customer for walk-in sales
+    defaultCustomerId: "WALK-IN",
+    defaultCustomerName: "Walk-in Customer",
+    createInvoiceForAllSales: true
   },
   currency: {
     primaryCurrency: 'USD',

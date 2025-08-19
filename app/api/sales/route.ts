@@ -67,43 +67,53 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // Process CRM invoice creation if customer is selected
+    // Process CRM invoice creation 
+    // Use selected customer or default walk-in customer
     let crmResult = null
-    if (body.customerId && body.customerName) {
-      try {
-        crmResult = await crmIntegration.processPOSSale(
-          saleId,
-          body.customerId,
-          body.customerName,
-          body.total,
-          body.items.map(item => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            total: item.price * item.quantity,
-            type: item.type,
-            sku: item.id, // Using item ID as SKU for now
-            costPrice: item.cost || 0 // Include cost price for reporting
-          })),
-          body.paymentMethod,
-          body.currency || 'USD',
-          body.warehouseId // Pass warehouse ID for invoice prefix
-        )
+    const customerId = body.customerId || 'WALK-IN'
+    const customerName = body.customerName || 'Walk-in Customer'
+    
+    // Always create invoice (for selected customer or walk-in)
+    try {
+      console.log('Creating CRM invoice with:', {
+        customerId,
+        customerName,
+        warehouseId: body.warehouseId,
+        total: body.total
+      })
+      
+      crmResult = await crmIntegration.processPOSSale(
+        saleId,
+        customerId,
+        customerName,
+        body.total,
+        body.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+          type: item.type,
+          sku: item.id, // Using item ID as SKU for now
+          costPrice: item.cost || 0 // Include cost price for reporting
+        })),
+        body.paymentMethod,
+        body.currency || 'USD',
+        body.warehouseId // Pass warehouse ID for invoice prefix
+      )
         
-        console.log('CRM invoice integration result:', {
-          success: crmResult.success,
-          invoice_id: crmResult.invoice_id,
-          invoice_number: crmResult.invoice_number,
-          serviceAvailable: crmResult.crmServiceAvailable
-        })
-      } catch (error) {
-        console.error('CRM integration failed:', error)
-        crmResult = {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          crmServiceAvailable: false
-        }
+      console.log('CRM invoice integration result:', {
+        success: crmResult.success,
+        invoice_id: crmResult.invoice_id,
+        invoice_number: crmResult.invoice_number,
+        serviceAvailable: crmResult.crmServiceAvailable
+      })
+    } catch (error) {
+      console.error('CRM integration failed:', error)
+      crmResult = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        crmServiceAvailable: false
       }
     }
     
