@@ -19,6 +19,7 @@ interface CrmInvoice {
   date?: string
   payment_method?: string
   pos_sale_id?: string
+  warehouse_id?: string // Warehouse ID for invoice prefix
   notes?: string
 }
 
@@ -127,7 +128,8 @@ class CrmIntegrationService {
       costPrice?: number // Cost price for reporting
     }>,
     paymentMethod: string,
-    currency: string = 'USD'
+    currency: string = 'USD',
+    warehouseId?: string
   ): Promise<{
     success: boolean
     invoice_id?: string
@@ -159,6 +161,7 @@ class CrmIntegrationService {
         date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
         payment_method: paymentMethod,
         pos_sale_id: saleId,
+        warehouse_id: warehouseId, // Include warehouse ID for invoice number prefix
         notes: `POS Sale #${saleId} - Payment: ${paymentMethod}`,
         line_items: items.map(item => ({
           description: item.name,

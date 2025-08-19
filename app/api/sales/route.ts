@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
             costPrice: item.cost || 0 // Include cost price for reporting
           })),
           body.paymentMethod,
-          body.currency || 'USD'
+          body.currency || 'USD',
+          body.warehouseId // Pass warehouse ID for invoice prefix
         )
         
         console.log('CRM invoice integration result:', {
