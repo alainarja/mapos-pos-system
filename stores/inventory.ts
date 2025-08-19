@@ -718,6 +718,24 @@ export const useInventoryStore = create<InventoryState>()(
           
           const apiData = await response.json()
           
+          // Log the raw inventory data to debug cost prices
+          console.log('=== INVENTORY DATA FROM API ===')
+          console.log('Total items received:', apiData.data?.length || 0)
+          if (apiData.data && apiData.data.length > 0) {
+            console.log('Sample item data (first 3 items):')
+            apiData.data.slice(0, 3).forEach((item: any, index: number) => {
+              console.log(`Item ${index + 1}:`, {
+                id: item.id,
+                name: item.name,
+                unit_price: item.unit_price,
+                selling_price: item.selling_price,
+                price: item.price,
+                quantity: item.quantity,
+                category: item.category
+              })
+            })
+          }
+          
           // Transform API data to Product format
           const { categoryMap } = get()
           const products = apiData.data.map((item: any) => ({
@@ -745,6 +763,23 @@ export const useInventoryStore = create<InventoryState>()(
             taxExempt: item.tax_exempt || item.taxExempt || false,
             taxCategory: item.tax_category || item.taxCategory || 'standard'
           }))
+          
+          // Log transformed products to verify cost is included
+          console.log('=== TRANSFORMED PRODUCTS ===')
+          console.log('Total products after transformation:', products.length)
+          if (products.length > 0) {
+            console.log('Sample transformed products (first 3):')
+            products.slice(0, 3).forEach((product: any, index: number) => {
+              console.log(`Product ${index + 1}:`, {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                cost: product.cost,
+                category: product.category,
+                stock: product.stock
+              })
+            })
+          }
           
           set({ products })
           

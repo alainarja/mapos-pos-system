@@ -83,6 +83,7 @@ interface DisplayItem {
   id: string
   name: string
   price: number
+  cost?: number
   category: string
   image?: string
   stock?: number
@@ -226,11 +227,23 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
   const [showCashCount, setShowCashCount] = useState(false)
 
   const addToCart = (item: DisplayItem) => {
+    // Log the item being added to debug cost
+    console.log('=== ADDING ITEM TO CART ===')
+    console.log('DisplayItem:', {
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      cost: item.cost,
+      type: item.type,
+      category: item.category
+    })
+    
     // Transform DisplayItem to cart-compatible format
     const cartItem = {
       id: item.id,
       name: item.name,
       price: item.price,
+      cost: item.cost || 0, // Include cost for profit reporting
       image: item.image || (item.type === 'service' ? '/placeholder-service.svg' : '/placeholder.svg'),
       category: item.category,
       stock: item.stock || (item.type === 'service' ? 999 : 0), // Services have unlimited "stock"
@@ -244,6 +257,14 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       taxExempt: item.taxExempt || false,
       taxCategory: item.taxCategory || 'standard'
     }
+    
+    console.log('CartItem created:', {
+      id: cartItem.id,
+      name: cartItem.name,
+      price: cartItem.price,
+      cost: cartItem.cost,
+      type: cartItem.type
+    })
     
     addItem(cartItem)
     
@@ -325,6 +346,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       id: product.id,
       name: product.name,
       price: product.price,
+      cost: product.cost || 0, // Include cost for profit tracking
       category: product.category,
       image: product.image,
       stock: product.stock,

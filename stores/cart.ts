@@ -559,6 +559,20 @@ export const useCartStore = create<CartState>()(
             cost: item.cost || 0 // Include cost price for reporting
           }))
           
+          // Log sale items to debug cost being sent
+          console.log('=== PROCESSING SALE ===')
+          console.log('Sale items being sent to API:')
+          saleItems.forEach((item, index) => {
+            console.log(`Item ${index + 1}:`, {
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              cost: item.cost,
+              quantity: item.quantity,
+              type: item.type
+            })
+          })
+          
           // Get store metadata
           const storeMetadata = state.currentStore ? 
             storeIdentificationService.getTransactionMetadata(state.currentStore) : null
