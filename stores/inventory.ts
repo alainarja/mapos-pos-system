@@ -621,8 +621,8 @@ export const useInventoryStore = create<InventoryState>()(
           const products = apiData.data.map((item: any) => ({
             id: item.id,
             name: item.name,
-            price: item.selling_price || item.price || 0,
-            cost: item.unit_price || 0,
+            price: item.selling_price || item.unit_price || item.price || 0, // Use selling_price first, fallback to unit_price if no selling_price
+            cost: item.unit_price || item.cost || 0, // unit_price is the cost/purchase price
             category: categoryMap[item.category] || 'Uncategorized',
             image: item.imageUrl || item.image_url,
             stock: item.quantity || 0,
@@ -720,6 +720,7 @@ export const useInventoryStore = create<InventoryState>()(
           
           // Log the raw inventory data to debug cost prices
           console.log('=== INVENTORY DATA FROM API ===')
+          console.log('Raw API Response:', JSON.stringify(apiData, null, 2))
           console.log('Total items received:', apiData.data?.length || 0)
           if (apiData.data && apiData.data.length > 0) {
             console.log('Sample item data (first 3 items):')
@@ -741,8 +742,8 @@ export const useInventoryStore = create<InventoryState>()(
           const products = apiData.data.map((item: any) => ({
             id: item.id,
             name: item.name,
-            price: item.selling_price || item.price || 0,
-            cost: item.unit_price || 0,
+            price: item.selling_price || item.unit_price || item.price || 0, // Use selling_price first, fallback to unit_price if no selling_price
+            cost: item.unit_price || item.cost || 0, // unit_price is the cost/purchase price
             category: categoryMap[item.category] || 'Uncategorized',
             image: item.imageUrl || item.image_url,
             stock: item.quantity || 0,
