@@ -34,7 +34,15 @@ export default function HomePage() {
         location: (response.user as any)?.location
       })
       
-      setUser(response.user)
+      // TEMPORARY: Add default warehouse to user if not provided by maposusers
+      // This ensures invoices have warehouse prefix until maposusers is updated
+      const userWithWarehouse = {
+        ...response.user,
+        warehouseId: (response.user as any)?.warehouseId || 'WH1',
+        warehouseName: (response.user as any)?.warehouseName || 'Main Warehouse'
+      }
+      
+      setUser(userWithWarehouse)
       setAuthMode("authenticated")
       setLoginError(null)
     } catch (error) {
@@ -49,7 +57,27 @@ export default function HomePage() {
   const handlePinUnlock = async (pin: string) => {
     try {
       const response = await maposUsersAuth.loginWithPin({ pin })
-      setUser(response.user)
+      
+      // Log user data to check for warehouse info
+      console.log('=== PIN LOGIN SUCCESSFUL ===')
+      console.log('User data received:', response.user)
+      console.log('Warehouse/Store info in user:', {
+        warehouseId: (response.user as any)?.warehouseId,
+        warehouse: (response.user as any)?.warehouse,
+        storeId: (response.user as any)?.storeId,
+        store: (response.user as any)?.store,
+        location: (response.user as any)?.location
+      })
+      
+      // TEMPORARY: Add default warehouse to user if not provided by maposusers
+      // This ensures invoices have warehouse prefix until maposusers is updated
+      const userWithWarehouse = {
+        ...response.user,
+        warehouseId: (response.user as any)?.warehouseId || 'WH1',
+        warehouseName: (response.user as any)?.warehouseName || 'Main Warehouse'
+      }
+      
+      setUser(userWithWarehouse)
       setAuthMode("authenticated")
       pinLockRef.current?.handleAuthResult(true)
     } catch (error) {
@@ -79,5 +107,9 @@ export default function HomePage() {
     return <PinLock ref={pinLockRef} onUnlock={handlePinUnlock} onBack={() => setAuthMode("login")} />
   }
 
-  return <MainSalesScreen user={user?.fullName || user?.email || 'User'} onLogout={handleLogout} />
+  return <MainSalesScreen 
+    user={user?.fullName || user?.email || 'User'} 
+    userWarehouseId={(user as any)?.warehouseId}
+    onLogout={handleLogout} 
+  />
 }

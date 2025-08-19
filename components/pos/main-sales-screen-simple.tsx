@@ -107,10 +107,11 @@ interface CartItem {
 
 interface MainSalesScreenProps {
   user: string
+  userWarehouseId?: string
   onLogout: () => void
 }
 
-export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
+export function MainSalesScreen({ user, userWarehouseId, onLogout }: MainSalesScreenProps) {
   const { playSuccess, playError, playSpecial, playBeep, isEnabled, volume, setEnabled, setVolume } = useSound()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
@@ -783,7 +784,7 @@ export function MainSalesScreen({ user, onLogout }: MainSalesScreenProps) {
       const result = await processSale(
         paymentMethod, 
         currentUser?.username || currentUser?.id || "Store Cashier",
-        undefined // Backend resolves warehouse from user
+        userWarehouseId // Pass warehouse ID from authenticated user
       )
 
       if (result.success) {

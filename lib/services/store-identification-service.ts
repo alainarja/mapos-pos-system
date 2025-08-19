@@ -322,11 +322,12 @@ class StoreIdentificationService {
         isMainLocation: apiStore.is_main_location || false,
         isActive: apiStore.is_active !== false
       },
-      warehouse: apiStore.warehouse_id ? {
-        warehouseId: apiStore.warehouse_id,
-        warehouseName: apiStore.warehouse_name || 'Main Warehouse',
+      // Always provide warehouse info, use defaults if not provided by API
+      warehouse: {
+        warehouseId: apiStore.warehouse_id || `WH-${apiStore.id || 'DEFAULT'}`,
+        warehouseName: apiStore.warehouse_name || apiStore.name || 'Main Warehouse',
         inventoryManaged: apiStore.inventory_managed !== false
-      } : undefined,
+      },
       pos: {
         terminalId: this.generateTerminalId(),
         deviceId: this.getDeviceId(),
