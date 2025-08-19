@@ -112,6 +112,13 @@ interface MainSalesScreenProps {
 }
 
 export function MainSalesScreen({ user, userWarehouseId, onLogout }: MainSalesScreenProps) {
+  // Log props on component mount
+  useEffect(() => {
+    console.log('=== MAIN SALES SCREEN PROPS ===')
+    console.log('User:', user)
+    console.log('User Warehouse ID:', userWarehouseId)
+  }, [user, userWarehouseId])
+  
   const { playSuccess, playError, playSpecial, playBeep, isEnabled, volume, setEnabled, setVolume } = useSound()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
@@ -781,6 +788,11 @@ export function MainSalesScreen({ user, userWarehouseId, onLogout }: MainSalesSc
       })
 
       // Process sale through API with inventory updates
+      console.log('=== PROCESSING SALE FROM UI ===')
+      console.log('Payment Method:', paymentMethod)
+      console.log('User:', currentUser?.username || currentUser?.id || "Store Cashier")
+      console.log('User Warehouse ID from props:', userWarehouseId)
+      
       const result = await processSale(
         paymentMethod, 
         currentUser?.username || currentUser?.id || "Store Cashier",

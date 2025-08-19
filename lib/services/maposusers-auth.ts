@@ -27,6 +27,18 @@ export interface AuthUser {
   permissions: string[]
   modules: string[]
   authMethod: 'login' | 'pin'
+  // Warehouse information
+  warehouseId?: string
+  warehouseName?: string
+  locationId?: string
+  locationName?: string
+  posLocation?: {
+    warehouseId: string
+    warehouseName: string
+    locationId: string
+    locationName: string
+    config?: any
+  }
 }
 
 export interface AuthTokens {
@@ -238,7 +250,11 @@ class MaposUsersAuthService {
         isVerified: true,
         permissions: ['*'],
         modules: ['POS', 'Sales', 'Inventory', 'CRM', 'Reports'],
-        authMethod: 'login'
+        authMethod: 'login',
+        warehouseId: 'WH1',
+        warehouseName: 'Main Warehouse',
+        locationId: 'LOC1',
+        locationName: 'Main Store'
       },
       'manager@pos.com': {
         id: 'mock_manager_id',
@@ -299,7 +315,11 @@ class MaposUsersAuthService {
         isVerified: true,
         permissions: ['pos.view', 'pos.edit', 'pos.admin', 'pos.reports', 'sales.view', 'sales.edit', 'inventory.view', 'crm.view'],
         modules: ['POS', 'Sales', 'Inventory', 'CRM'],
-        authMethod: 'pin'
+        authMethod: 'pin',
+        warehouseId: 'WH1',
+        warehouseName: 'Main Warehouse',
+        locationId: 'LOC1',
+        locationName: 'Main Store'
       },
       '5678': {
         id: 'mock_cashier_id',
