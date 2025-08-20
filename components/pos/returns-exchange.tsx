@@ -28,16 +28,26 @@ import {
   DollarSign,
   Package,
   Eye,
-  Trash2
+  Trash2,
+  Banknote,
+  Wallet
 } from "lucide-react"
 
 interface ReturnsExchangeProps {
   onComplete?: (transaction: any) => void
   onCancel?: () => void
   mode?: 'standalone' | 'embedded'
+  currentUser?: string
+  requireManagerApproval?: boolean
 }
 
-export function ReturnsExchange({ onComplete, onCancel, mode = 'embedded' }: ReturnsExchangeProps) {
+export function ReturnsExchange({ 
+  onComplete, 
+  onCancel, 
+  mode = 'embedded',
+  currentUser = 'Current User',
+  requireManagerApproval = true
+}: ReturnsExchangeProps) {
   const [currentStep, setCurrentStep] = useState<'search' | 'items' | 'processing' | 'complete'>('search')
   const [searchTerm, setSearchTerm] = useState("")
   const [searchMethod, setSearchMethod] = useState<'receipt' | 'customer' | 'manual'>('receipt')
@@ -46,6 +56,10 @@ export function ReturnsExchange({ onComplete, onCancel, mode = 'embedded' }: Ret
   const [returnType, setReturnType] = useState<'return' | 'exchange'>('return')
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [completedReturn, setCompletedReturn] = useState<any>(null)
+  const [refundMethod, setRefundMethod] = useState<'original' | 'cash' | 'store_credit'>('original')
+  const [managerApproval, setManagerApproval] = useState<{ approved: boolean; managerId?: string; pin?: string } | null>(null)
+  const [showManagerApprovalDialog, setShowManagerApprovalDialog] = useState(false)
+  const [managerPin, setManagerPin] = useState('')
   
   // Integration with real data stores
   const {
@@ -152,9 +166,11 @@ export function ReturnsExchange({ onComplete, onCancel, mode = 'embedded' }: Ret
           notes: item.notes,
           sku: item.sku
         })),
-        refundAmount: calculateRefundAmount(),
-        refundMethod: 'original',
-        processedBy: 'Current User'
+        refundAmount: refundAmount,
+        refundMethod: refundMethod,
+        processedBy: currentUser,
+        managerApproval: managerApproval,
+        timestamp: new Date().toISOString()
       }
       
       // Process through integrated system
@@ -170,8 +186,9 @@ export function ReturnsExchange({ onComplete, onCancel, mode = 'embedded' }: Ret
           originalTransaction: selectedTransaction,
           returnItems: returnItems,
           refundAmount: calculateRefundAmount(),
-          refundMethod: returnTransaction.refundMethod || 'original',
-          processedBy: returnTransaction.processedBy || 'Current User'
+          refundMethod: refundMethod,
+          processedBy: currentUser,
+          managerApproval: managerApproval
         })
         setCurrentStep('complete')
         if (onComplete) {
@@ -346,7 +363,17 @@ export function ReturnsExchange({ onComplete, onCancel, mode = 'embedded' }: Ret
                     <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-orange-500" />
                     <h4 className="text-md font-semibold text-gray-900 mb-2">No Receipt Return</h4>
                     <p className="text-gray-600 text-sm mb-3">Process return without original receipt (requires manager approval)</p>
-                    <Button variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50">
+                    <Button 
+                      variant="outline" 
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                      onClick={() => {
+                        if (requireManagerApproval) {
+                          setShowManagerApprovalDialog(true)
+                        } else {
+                          setCurrentStep('items')
+                        }
+                      }}
+                    >
                       Continue Without Receipt
                     </Button>
                   </div>
@@ -758,6 +785,97 @@ Customer Copy - Keep for your records
         onScanComplete={handleBarcodeScanned}
         onCancel={handleBarcodeScanCancel}
       />
+
+      {/* Manager Approval Dialog */}
+      {showManagerApprovalDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 bg-white">
+            <CardHeader className="bg-orange-500 text-white">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Manager Approval Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <p className="text-gray-700">
+                This {returnType} requires manager approval.
+                {calculateRefundAmount() > 100 && (
+                  <span className="block mt-2 text-sm text-orange-600">
+                    Refund amount exceeds $100 threshold
+                  </span>
+                )}
+              </p>
+              
+              <div className="space-y-2">
+                <Label>Manager PIN</Label>
+                <Input
+                  type="password"
+                  placeholder="Enter manager PIN"
+                  value={managerPin}
+                  onChange={(e) => setManagerPin(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && managerPin) {
+                      // Validate manager PIN (in production, verify against real system)
+                      if (managerPin === '1234' || managerPin === '9999') {
+                        setManagerApproval({
+                          approved: true,
+                          managerId: 'MGR-' + managerPin,
+                          pin: managerPin
+                        })
+                        setShowManagerApprovalDialog(false)
+                        setManagerPin('')
+                        // Auto-proceed if we were trying to process
+                        if (returnItems.length > 0) {
+                          handleProcessReturn()
+                        }
+                      } else {
+                        alert('Invalid manager PIN')
+                      }
+                    }
+                  }}
+                />
+                <p className="text-xs text-gray-500">Test PINs: 1234 or 9999</p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowManagerApprovalDialog(false)
+                    setManagerPin('')
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (managerPin === '1234' || managerPin === '9999') {
+                      setManagerApproval({
+                        approved: true,
+                        managerId: 'MGR-' + managerPin,
+                        pin: managerPin
+                      })
+                      setShowManagerApprovalDialog(false)
+                      setManagerPin('')
+                      // Auto-proceed if we were trying to process
+                      if (returnItems.length > 0) {
+                        handleProcessReturn()
+                      }
+                    } else {
+                      alert('Invalid manager PIN')
+                    }
+                  }}
+                  disabled={!managerPin}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  Approve
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

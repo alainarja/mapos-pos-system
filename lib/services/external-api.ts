@@ -58,7 +58,27 @@ class ExternalAPIService {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+      // Try to parse error response
+      try {
+        const errorData = await response.json()
+        // Check for known database error from inventorymarble API
+        if (errorData.error?.message?.includes('column suppliers_1.vat_rate does not exist')) {
+          console.warn('Known issue with inventorymarble API - suppliers.vat_rate column error')
+          // Return empty data to prevent app crash
+          return {
+            data: [],
+            pagination: {
+              page: parseInt(params?.page || '1'),
+              perPage: parseInt(params?.perPage || '100'),
+              total: 0,
+              totalPages: 0
+            }
+          }
+        }
+        throw new Error(errorData.error || `API request failed: ${response.status} ${response.statusText}`)
+      } catch (e) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+      }
     }
 
     return response.json()
