@@ -5,6 +5,7 @@ import localFont from "next/font/local"
 import { SoundProvider } from "@/components/sound-provider"
 import { GradientAnimation } from "@/components/ui/gradient-animation"
 import { InventoryLoader } from "@/components/inventory-loader"
+import { ServiceWorkerRegistration } from "@/components/offline/service-worker-registration"
 import "./globals.css"
 
 const inter = Inter({
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
   title: "MAPOS - Modern Point of Sale",
   description: "Advanced retail POS system with modern interface",
   generator: "v0.dev",
+  manifest: "/offline-manifest.json",
 }
 
 export default function RootLayout({
@@ -42,6 +44,7 @@ export default function RootLayout({
           />
           <div className="absolute inset-0 bg-gradient-to-br from-purple-50/80 via-white/90 to-violet-100/80 backdrop-blur-sm" />
         </div>
+        <ServiceWorkerRegistration />
         <SoundProvider>
           <InventoryLoader />
           {children}

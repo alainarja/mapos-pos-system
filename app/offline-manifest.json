@@ -1,0 +1,24 @@
+{
+  "name": "MAPOS - Point of Sale",
+  "short_name": "MAPOS",
+  "description": "Modern Point of Sale System with Offline Support",
+  "theme_color": "#8b5cf6",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "landscape",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/images/mapos-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/mapos-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
+}

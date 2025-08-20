@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAPOS - Offline Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .offline-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: #f3f4f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        
+        h1 {
+            color: #1f2937;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            color: #6b7280;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .feature-list {
+            text-align: left;
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 10px;
+        }
+        
+        .feature-list h3 {
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .feature-list ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            color: #4b5563;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .sync-status {
+            padding: 15px;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .sync-status.online {
+            background: #d1fae5;
+            border-color: #10b981;
+        }
+        
+        .btn-retry {
+            background: #7c3aed;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        
+        .btn-retry:hover {
+            background: #6d28d9;
+        }
+        
+        .queue-count {
+            margin-top: 20px;
+            padding: 10px;
+            background: #ede9fe;
+            border-radius: 8px;
+            color: #5b21b6;
+            font-weight: 500;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .loading {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">
+            <span id="status-icon">📡</span>
+        </div>
+        
+        <h1>MAPOS - Offline Mode</h1>
+        <p class="status" id="connection-status">No internet connection detected</p>
+        
+        <div class="feature-list">
+            <h3>Available in Offline Mode:</h3>
+            <ul>
+                <li>Process cash sales</li>
+                <li>Add products to cart</li>
+                <li>Calculate totals and change</li>
+                <li>Save transactions locally</li>
+                <li>View recent transactions</li>
+            </ul>
+        </div>
+        
+        <div class="sync-status" id="sync-status">
+            <strong>Sync Status:</strong>
+            <span id="sync-message">Transactions will sync automatically when online</span>
+        </div>
+        
+        <div class="queue-count" id="queue-count" style="display: none;">
+            <span id="queue-message">0 transactions pending sync</span>
+        </div>
+        
+        <button class="btn-retry" onclick="checkConnection()">
+            Check Connection
+        </button>
+    </div>
+    
+    <script>
+        let isOnline = navigator.onLine;
+        let queueCount = 0;
+        
+        // Check localStorage for queued transactions
+        function updateQueueCount() {
+            try {
+                const queue = JSON.parse(localStorage.getItem('offline-queue') || '[]');
+                queueCount = queue.length;
+                
+                if (queueCount > 0) {
+                    document.getElementById('queue-count').style.display = 'block';
+                    document.getElementById('queue-message').textContent = 
+                        `${queueCount} transaction${queueCount > 1 ? 's' : ''} pending sync`;
+                } else {
+                    document.getElementById('queue-count').style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Error reading queue:', e);
+            }
+        }
+        
+        // Check connection status
+        function checkConnection() {
+            const statusIcon = document.getElementById('status-icon');
+            const connectionStatus = document.getElementById('connection-status');
+            const syncStatus = document.getElementById('sync-status');
+            const syncMessage = document.getElementById('sync-message');
+            
+            statusIcon.classList.add('loading');
+            
+            fetch('/api/health', { method: 'HEAD' })
+                .then(() => {
+                    // Online
+                    isOnline = true;
+                    statusIcon.textContent = '✅';
+                    connectionStatus.textContent = 'Connection restored!';
+                    syncStatus.classList.add('online');
+                    syncMessage.textContent = 'Syncing queued transactions...';
+                    
+                    // Trigger sync
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.ready.then(registration => {
+                            registration.active.postMessage({ type: 'FORCE_SYNC' });
+                        });
+                    }
+                    
+                    // Redirect to main app after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+                })
+                .catch(() => {
+                    // Still offline
+                    isOnline = false;
+                    statusIcon.textContent = '🔴';
+                    connectionStatus.textContent = 'Still offline - sales can continue';
+                    syncStatus.classList.remove('online');
+                    syncMessage.textContent = 'Transactions will sync when connection is restored';
+                })
+                .finally(() => {
+                    statusIcon.classList.remove('loading');
+                });
+        }
+        
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            checkConnection();
+        });
+        
+        window.addEventListener('offline', () => {
+            isOnline = false;
+            document.getElementById('status-icon').textContent = '🔴';
+            document.getElementById('connection-status').textContent = 'Connection lost';
+            document.getElementById('sync-status').classList.remove('online');
+        });
+        
+        // Update queue count on load
+        updateQueueCount();
+        
+        // Check queue every 5 seconds
+        setInterval(updateQueueCount, 5000);
+        
+        // Auto-check connection every 30 seconds
+        setInterval(() => {
+            if (!isOnline) {
+                checkConnection();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

@@ -55,6 +55,8 @@ import { usePrintStore } from "@/stores/print"
 import { ReturnsExchange } from "@/components/pos/returns-exchange"
 import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration"
 import { CashCountDialog } from "@/components/cash/cash-count-dialog"
+import { OfflineIndicator } from "@/components/offline/offline-indicator"
+import { useOffline } from "@/hooks/use-offline"
 import { MixedCurrencyPayment, PaymentDetails } from "@/components/pos/mixed-currency-payment"
 import { DiscountDialog, DiscountDetails } from "@/components/pos/discount-dialog"
 import { CustomerSelector } from "@/components/pos/customer-selector"
@@ -179,6 +181,8 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   } = useCashManagementStore()
   
   const { printCashDrawerReport, loadCompanyInfo, refreshCompanyInfo, isLoadingCompanyInfo } = usePrintStore()
+  
+  const { status: offlineStatus, queueTransaction, cacheData } = useOffline()
   
   const [showCategorySelection, setShowCategorySelection] = useState(true)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
@@ -587,6 +591,43 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
       servicesData: services.slice(0, 2)
     })
   }, [mockProducts, services])
+  
+  // Cache data for offline use
+  useEffect(() => {
+    if (mockProducts.length > 0 || services.length > 0) {
+      cacheData({
+        products: [...mockProducts, ...services],
+        customers: [] // Add customers when available
+      }).then(() => {
+        console.log('[Offline] Cached', mockProducts.length + services.length, 'products for offline use')
+      })
+    }
+  }, [mockProducts, services, cacheData])
+  
+  // Monitor offline status changes
+  useEffect(() => {
+    if (offlineStatus.isSupported) {
+      if (!offlineStatus.isOnline) {
+        addNotification({
+          id: 'offline-mode',
+          type: 'warning',
+          title: 'Offline Mode',
+          message: 'No internet connection. Sales will be saved and synced when online.',
+          timestamp: new Date(),
+          isRead: false
+        })
+      } else if (offlineStatus.queueSize > 0) {
+        addNotification({
+          id: 'sync-pending',
+          type: 'info',
+          title: 'Syncing Transactions',
+          message: `${offlineStatus.queueSize} transactions pending sync`,
+          timestamp: new Date(),
+          isRead: false
+        })
+      }
+    }
+  }, [offlineStatus.isOnline, offlineStatus.queueSize, offlineStatus.isSupported, addNotification])
 
   // Enhanced keyboard shortcuts
   useEffect(() => {
@@ -893,11 +934,47 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
       console.log('User:', currentUser?.username || currentUser?.id || "Store Cashier")
       console.log('User Warehouse ID from props:', userWarehouseId)
       
-      const result = await processSale(
-        paymentMethod, 
-        currentUser?.username || currentUser?.id || "Store Cashier",
-        userWarehouseId // Pass warehouse ID from authenticated user
-      )
+      // Check if offline
+      let result
+      
+      if (!offlineStatus.isOnline) {
+        // Offline mode - queue the transaction
+        const offlineTransaction = {
+          id: `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString(),
+          items: cart,
+          paymentMethod,
+          customer: selectedCustomer,
+          cashier: currentUser?.username || currentUser?.id || "Store Cashier",
+          warehouseId: userWarehouseId,
+          subtotal,
+          discount: totalSavings,
+          tax,
+          total: finalTotal,
+          referral: appliedReferral,
+          coupons: appliedCoupon ? [appliedCoupon] : [],
+          offline: true,
+          receiptNumber: `RCP-${Date.now().toString().slice(-8)}`
+        }
+        
+        const queueResult = await queueTransaction(offlineTransaction)
+        
+        result = {
+          success: queueResult.success,
+          saleId: offlineTransaction.id,
+          message: queueResult.queued ? 
+            'Sale saved offline. Will sync when connection restored.' :
+            'Sale completed successfully.',
+          offline: queueResult.queued
+        }
+      } else {
+        // Online mode - normal processing
+        result = await processSale(
+          paymentMethod, 
+          currentUser?.username || currentUser?.id || "Store Cashier",
+          userWarehouseId // Pass warehouse ID from authenticated user
+        )
+      }
 
       if (result.success) {
         // Apply coupon to the inventory system if there's one
@@ -1507,6 +1584,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
 
           {/* Right - User Info */}
           <div className="flex items-center gap-3">
+            <OfflineIndicator />
             <Button
               variant="outline"
               size="sm"
