@@ -73,9 +73,8 @@ export interface Customer {
   name: string
   email: string
   phone: string
-  loyaltyPoints: number
+  whatsapp?: string  // WhatsApp number for sending receipts
   storeCredit: number
-  tier: LoyaltyTier
   address?: Address
   birthDate?: Date
   notes?: string
@@ -87,8 +86,6 @@ export interface Customer {
   averageOrderValue: number
   preferredCategories: string[]
   customerSegment: CustomerSegment
-  loyaltyPointsEarned: number
-  loyaltyPointsRedeemed: number
   referralCode?: string
   referredBy?: string
   tags: string[]

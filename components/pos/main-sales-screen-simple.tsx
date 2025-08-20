@@ -56,6 +56,8 @@ import { CouponInput } from "@/components/pos/coupon-input"
 import { ReturnsExchange } from "@/components/pos/returns-exchange"
 import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration"
 import { CashCountDialog } from "@/components/cash/cash-count-dialog"
+import { MixedCurrencyPayment, PaymentDetails } from "@/components/pos/mixed-currency-payment"
+import { DiscountDialog, DiscountDetails } from "@/components/pos/discount-dialog"
 import { CustomerSelector } from "@/components/pos/customer-selector"
 
 interface Product {
@@ -206,10 +208,36 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [voidReason, setVoidReason] = useState('')
   const [isTrainingMode, setIsTrainingMode] = useState(false)
   const [showTrainingDialog, setShowTrainingDialog] = useState(false)
+  const [showMixedPayment, setShowMixedPayment] = useState(false)
+  const [discountTarget, setDiscountTarget] = useState<{ itemId?: string, itemName?: string, price?: number } | null>(null)
+  const [showItemDiscountDialog, setShowItemDiscountDialog] = useState(false)
 
-  // Ensure training mode is disabled on component mount
+  // Ensure training mode is disabled on component mount and auto-select default customer
   useEffect(() => {
     setIsTrainingMode(false)
+    
+    // Auto-select default customer from settings
+    const { settings } = useSettingsStore.getState()
+    if (settings.store.defaultCustomerId && !selectedCustomer) {
+      const defaultCustomer: Customer = {
+        id: settings.store.defaultCustomerId,
+        name: settings.store.defaultCustomerName || 'Walk-in Customer',
+        email: 'walkin@store.com',
+        phone: '000-0000',
+        storeCredit: 0,
+        address: undefined,
+        isActive: true,
+        createdAt: new Date(),
+        totalSpent: 0,
+        visitCount: 0,
+        averageOrderValue: 0,
+        preferredCategories: [],
+        customerSegment: 'regular' as any,
+        tags: []
+      }
+      selectCustomer(defaultCustomer)
+    }
+    
     // Initialize store identification but override with user's warehouse if provided
     initializeStore().then(() => {
       // If user has a warehouse ID, update the store with it
@@ -721,6 +749,46 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
       receiptWindow.document.close()
       receiptWindow.print()
     }
+  }
+
+  const handleMixedPayment = async (paymentDetails: PaymentDetails) => {
+    // Process mixed currency payment
+    const paymentMethod = `Mixed: $${paymentDetails.usdAmount.toFixed(2)} USD + ${paymentDetails.lbpAmount.toLocaleString()} LBP`
+    await completeSale(paymentMethod)
+    setShowMixedPayment(false)
+  }
+  
+  const handleDiscount = (discount: DiscountDetails) => {
+    if (discountTarget?.itemId) {
+      // Apply item discount
+      applyItemDiscount(discountTarget.itemId, discount.value, discount.type)
+    } else {
+      // Apply cart discount
+      applyAdvancedDiscount({
+        type: discount.type,
+        value: discount.value,
+        reason: discount.reason,
+        managerId: discount.managerApproval ? 'manager' : undefined,
+        timestamp: new Date()
+      })
+    }
+    setShowDiscountDialog(false)
+    setShowItemDiscountDialog(false)
+    setDiscountTarget(null)
+  }
+  
+  const shareReceiptViaWhatsApp = async (receiptId: string, phoneNumber: string) => {
+    // Generate receipt URL
+    const receiptUrl = `${window.location.origin}/api/receipt/${receiptId}`
+    
+    // Create WhatsApp message
+    const message = encodeURIComponent(`Here's your receipt from MAPOS Retail Store: ${receiptUrl}`)
+    
+    // Format phone number (remove non-digits and add country code if needed)
+    const formattedPhone = phoneNumber.replace(/\D/g, '')
+    
+    // Open WhatsApp
+    window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank')
   }
 
   const completeSale = async (paymentMethod: string) => {
@@ -1840,6 +1908,19 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                       </div>
                       <div className="flex gap-1">
                         <SoundButton
+                          onClick={() => {
+                            setDiscountTarget({ itemId: item.id, itemName: item.name, price: item.price })
+                            setShowItemDiscountDialog(true)
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          soundType="click"
+                          className="h-6 w-6 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg hover:scale-110 transition-all duration-300"
+                          title="Apply Discount"
+                        >
+                          <Percent className="h-3 w-3" />
+                        </SoundButton>
+                        <SoundButton
                           onClick={() => initiatePriceOverride(item.id)}
                           variant="ghost"
                           size="sm"
@@ -1897,6 +1978,19 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
 
               {/* Cart Summary */}
               <div className="border-t pt-4 -mx-6 px-6 pb-6 rounded-t-xl border-purple-200 bg-gradient-to-r from-purple-50/50 to-violet-50/50">
+                {/* Cart Discount Button */}
+                <div className="mb-3">
+                  <Button
+                    onClick={() => setShowDiscountDialog(true)}
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-8 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  >
+                    <Percent className="h-3 w-3 mr-2" />
+                    Apply Cart Discount
+                  </Button>
+                </div>
+                
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm font-medium">
                     <span className="text-slate-600">Subtotal:</span>
@@ -1955,13 +2049,11 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                           <p className="text-xs text-blue-700">{selectedCustomer.email}</p>
                           <p className="text-xs text-blue-600">{selectedCustomer.phone}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              <Star className="h-2 w-2 mr-1" />
-                              {selectedCustomer.tier}
-                            </Badge>
-                            <span className="text-xs text-blue-600">
-                              {selectedCustomer.loyaltyPoints} points
-                            </span>
+                            {selectedCustomer.whatsapp && (
+                              <span className="text-xs text-green-600">
+                                📱 {selectedCustomer.whatsapp}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <Button
@@ -2081,13 +2173,11 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                       <p className="text-xs text-blue-700">{selectedCustomer.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        <Star className="h-2 w-2 mr-1" />
-                        {selectedCustomer.tier}
-                      </Badge>
-                      <span className="text-xs text-blue-600">
-                        {selectedCustomer.loyaltyPoints} pts
-                      </span>
+                      {selectedCustomer.whatsapp && (
+                        <span className="text-xs text-green-600">
+                          WhatsApp: {selectedCustomer.whatsapp}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2185,6 +2275,16 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                   className="h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold hover:scale-105 transition-all duration-300"
                 >
                   💳 Card
+                </SoundButton>
+                <SoundButton
+                  onClick={() => {
+                    setShowPaymentDialog(false)
+                    setShowMixedPayment(true)
+                  }}
+                  variant="default"
+                  className="h-14 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold hover:scale-105 transition-all duration-300"
+                >
+                  💱 Mixed Currency
                 </SoundButton>
                 <SoundButton
                   onClick={async () => {
@@ -3654,6 +3754,38 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         expectedAmount={safeCurrentDrawerAmount}
         cashier={user || "Unknown"}
       />
+      
+      {/* Mixed Currency Payment Dialog */}
+      {showMixedPayment && (
+        <MixedCurrencyPayment
+          total={total}
+          onComplete={handleMixedPayment}
+          onCancel={() => setShowMixedPayment(false)}
+        />
+      )}
+      
+      {/* Discount Dialog for Cart */}
+      {showDiscountDialog && !discountTarget && (
+        <DiscountDialog
+          currentPrice={subtotal}
+          onApply={handleDiscount}
+          onCancel={() => setShowDiscountDialog(false)}
+        />
+      )}
+      
+      {/* Discount Dialog for Item */}
+      {showItemDiscountDialog && discountTarget && (
+        <DiscountDialog
+          itemId={discountTarget.itemId}
+          itemName={discountTarget.itemName}
+          currentPrice={discountTarget.price}
+          onApply={handleDiscount}
+          onCancel={() => {
+            setShowItemDiscountDialog(false)
+            setDiscountTarget(null)
+          }}
+        />
+      )}
     </div>
   )
 }

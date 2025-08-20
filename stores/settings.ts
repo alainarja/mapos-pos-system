@@ -46,7 +46,9 @@ const defaultSettings: Settings = {
     autoUpdateRate: false,
     showBothCurrencies: true,
     acceptUsdCash: true,
-    acceptLbpCash: true
+    acceptLbpCash: true,
+    acceptMixedPayment: true,
+    roundLbpTo: 1000 // Round LBP amounts to nearest 1000
   },
   receipt: {
     header: "Thank you for your purchase!",

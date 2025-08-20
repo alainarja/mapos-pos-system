@@ -1,375 +1,256 @@
 "use client"
 
 import React, { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { SoundButton } from "@/components/ui/sound-button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import {
-  Percent,
-  DollarSign,
-  X,
-  Check,
-  AlertTriangle,
-  Shield,
-  Tag,
-  Calculator
-} from "lucide-react"
-import { modalVariants, backdropVariants } from "@/lib/animations"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Percent, DollarSign, Shield, X } from "lucide-react"
+import { useUserStore } from "@/stores/user"
 
 interface DiscountDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onApplyDiscount: (discount: number, type: 'percentage' | 'fixed', reason?: string, requiresOverride?: boolean) => void
-  onApplyItemDiscount?: (itemId: string, discount: number, type: 'percentage' | 'fixed') => void
-  currentDiscount?: number
-  cartTotal: number
-  selectedItemId?: string
-  selectedItemName?: string
-  selectedItemPrice?: number
-  isDarkMode?: boolean
+  itemId?: string // If provided, it's an item discount. Otherwise, it's cart discount
+  itemName?: string
+  currentPrice?: number
+  onApply: (discount: DiscountDetails) => void
+  onCancel: () => void
 }
 
-export function DiscountDialog({
-  isOpen,
-  onClose,
-  onApplyDiscount,
-  onApplyItemDiscount,
-  currentDiscount = 0,
-  cartTotal,
-  selectedItemId,
-  selectedItemName,
-  selectedItemPrice,
-  isDarkMode = false
+export interface DiscountDetails {
+  type: 'percentage' | 'fixed'
+  value: number
+  reason: string
+  managerApproval?: boolean
+  appliedBy: string
+  appliedAt: Date
+}
+
+export function DiscountDialog({ 
+  itemId, 
+  itemName, 
+  currentPrice = 0, 
+  onApply, 
+  onCancel 
 }: DiscountDialogProps) {
+  const { currentUser } = useUserStore()
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage')
-  const [discountValue, setDiscountValue] = useState('')
-  const [reason, setReason] = useState('')
-  const [showManagerOverride, setShowManagerOverride] = useState(false)
-  const [managerId, setManagerId] = useState('')
-  const [activeTab, setActiveTab] = useState<'cart' | 'item'>('cart')
-
-  // Predefined discount options
-  const quickPercentages = [5, 10, 15, 20, 25, 30]
-  const quickAmounts = [5, 10, 20, 50]
-
-  const isItemMode = selectedItemId && onApplyItemDiscount
-  const targetAmount = isItemMode && activeTab === 'item' ? (selectedItemPrice || 0) : cartTotal
-
-  const calculatePreview = () => {
-    const value = parseFloat(discountValue) || 0
-    if (value <= 0) return { discount: 0, newTotal: targetAmount, savings: 0 }
-
-    let discountAmount = 0
-    if (discountType === 'percentage') {
-      discountAmount = targetAmount * (value / 100)
-    } else {
-      discountAmount = Math.min(value, targetAmount)
-    }
-
-    return {
-      discount: discountAmount,
-      newTotal: targetAmount - discountAmount,
-      savings: discountAmount,
-      percentage: (discountAmount / targetAmount) * 100
-    }
-  }
-
-  const preview = calculatePreview()
-  const requiresManagerOverride = preview.percentage > 30 // Require override for >30% discount
-
-  const handleApplyDiscount = () => {
-    const value = parseFloat(discountValue) || 0
-    if (value <= 0) return
-
-    if (requiresManagerOverride && !managerId.trim()) {
-      setShowManagerOverride(true)
+  const [discountValue, setDiscountValue] = useState("")
+  const [reason, setReason] = useState("")
+  const [managerPin, setManagerPin] = useState("")
+  const [requiresApproval, setRequiresApproval] = useState(false)
+  
+  // Check if user has discount permissions
+  const hasDiscountPermission = currentUser?.permissions?.some(p => 
+    p === '*' || p === 'pos.discount' || p === 'sales.discount' || p === 'manager'
+  ) ?? false
+  
+  const handleApply = () => {
+    const value = parseFloat(discountValue)
+    
+    if (isNaN(value) || value <= 0) {
       return
     }
-
-    if (isItemMode && activeTab === 'item' && selectedItemId && onApplyItemDiscount) {
-      onApplyItemDiscount(selectedItemId, value, discountType)
-    } else {
-      onApplyDiscount(value, discountType, reason || undefined, requiresManagerOverride)
+    
+    // Validate percentage discounts
+    if (discountType === 'percentage' && value > 100) {
+      return
     }
     
-    handleClose()
+    // Check if manager approval is needed (discounts over 20% or $50)
+    const needsApproval = discountType === 'percentage' 
+      ? value > 20 
+      : value > 50
+    
+    if (needsApproval && !managerPin) {
+      setRequiresApproval(true)
+      return
+    }
+    
+    onApply({
+      type: discountType,
+      value,
+      reason,
+      managerApproval: needsApproval,
+      appliedBy: currentUser?.fullName || 'Staff',
+      appliedAt: new Date()
+    })
   }
-
-  const handleClose = () => {
-    setDiscountValue('')
-    setReason('')
-    setManagerId('')
-    setShowManagerOverride(false)
-    setActiveTab('cart')
-    onClose()
+  
+  const calculateDiscountedPrice = () => {
+    const value = parseFloat(discountValue) || 0
+    if (discountType === 'percentage') {
+      return currentPrice - (currentPrice * value / 100)
+    } else {
+      return Math.max(0, currentPrice - value)
+    }
   }
-
-  const handleQuickDiscount = (value: number, type: 'percentage' | 'fixed') => {
-    setDiscountType(type)
-    setDiscountValue(value.toString())
-  }
-
-  if (!isOpen) return null
-
+  
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        {/* Backdrop */}
-        <motion.div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-          variants={backdropVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          onClick={handleClose}
-        />
-        
-        {/* Dialog */}
-        <motion.div
-          className="relative z-10 w-full max-w-md mx-4"
-          variants={modalVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-        >
-          <Card
-            className={`backdrop-blur-xl transition-all duration-300 ${
-              isDarkMode ? 'border-purple-500/30' : 'bg-white/95 border-purple-200'
-            }`}
-            style={{
-              background: isDarkMode 
-                ? 'linear-gradient(135deg, oklch(0.12 0.032 264) 0%, oklch(0.14 0.025 280) 100%)'
-                : undefined,
-              boxShadow: isDarkMode
-                ? "0 25px 80px rgba(0,0,0,0.6), 0 10px 40px rgba(139,92,246,0.4), inset 0 1px 0 rgba(255,255,255,0.05)"
-                : "0 25px 80px rgba(139,92,246,0.3), 0 10px 40px rgba(139,92,246,0.2)",
-            }}
-          >
-            <CardContent className="p-6">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                  isDarkMode 
-                    ? 'text-slate-100' 
-                    : 'bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent'
-                }`}>
-                  Apply Discount
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClose}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Tab Selection (if item mode available) */}
-              {isItemMode && (
-                <div className="flex rounded-lg bg-purple-50 p-1 mb-4">
-                  <button
-                    onClick={() => setActiveTab('cart')}
-                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all ${
-                      activeTab === 'cart'
-                        ? 'bg-white text-purple-700 shadow-sm'
-                        : 'text-purple-600 hover:text-purple-700'
-                    }`}
-                  >
-                    <Tag className="w-4 h-4 inline mr-2" />
-                    Cart Discount
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('item')}
-                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all ${
-                      activeTab === 'item'
-                        ? 'bg-white text-purple-700 shadow-sm'
-                        : 'text-purple-600 hover:text-purple-700'
-                    }`}
-                  >
-                    <Calculator className="w-4 h-4 inline mr-2" />
-                    Item: {selectedItemName}
-                  </button>
-                </div>
-              )}
-
-              {/* Target Info */}
-              <div className={`p-3 rounded-lg mb-4 ${
-                isDarkMode ? 'bg-slate-800/50' : 'bg-purple-50'
-              }`}>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${
-                    isDarkMode ? 'text-slate-300' : 'text-purple-700'
-                  }`}>
-                    {activeTab === 'item' ? `${selectedItemName} Price:` : 'Cart Total:'}
-                  </span>
-                  <span className={`font-bold ${
-                    isDarkMode ? 'text-slate-100' : 'text-purple-800'
-                  }`}>
-                    ${targetAmount.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Discount Type Selection */}
-              <div className="flex rounded-lg bg-purple-50 p-1 mb-4">
-                <button
-                  onClick={() => setDiscountType('percentage')}
-                  className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all ${
-                    discountType === 'percentage'
-                      ? 'bg-white text-purple-700 shadow-sm'
-                      : 'text-purple-600 hover:text-purple-700'
-                  }`}
-                >
-                  <Percent className="w-4 h-4 inline mr-2" />
-                  Percentage
-                </button>
-                <button
-                  onClick={() => setDiscountType('fixed')}
-                  className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all ${
-                    discountType === 'fixed'
-                      ? 'bg-white text-purple-700 shadow-sm'
-                      : 'text-purple-600 hover:text-purple-700'
-                  }`}
-                >
-                  <DollarSign className="w-4 h-4 inline mr-2" />
-                  Fixed Amount
-                </button>
-              </div>
-
-              {/* Quick Discount Buttons */}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <Card className="w-full max-w-md mx-4 bg-white">
+        <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+          <CardTitle className="text-lg font-bold flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Percent className="h-5 w-5" />
+              {itemId ? `Discount for ${itemName}` : 'Cart Discount'}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onCancel}
+              className="text-white hover:bg-white/20"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          {!hasDiscountPermission ? (
+            <div className="text-center py-8">
+              <Shield className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+              <p className="text-lg font-medium text-slate-700">Manager Approval Required</p>
+              <p className="text-sm text-slate-500 mt-2">
+                You don't have permission to apply discounts. Please ask a manager.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Discount Type */}
               <div className="mb-4">
-                <p className="text-sm font-medium text-slate-600 mb-2">Quick Options:</p>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {(discountType === 'percentage' ? quickPercentages : quickAmounts).map((value) => (
-                    <SoundButton
-                      key={value}
-                      onClick={() => handleQuickDiscount(value, discountType)}
-                      variant="outline"
-                      size="sm"
-                      soundType="click"
-                      className="h-10 text-purple-600 border-purple-200 hover:bg-purple-50"
-                    >
-                      {discountType === 'percentage' ? `${value}%` : `$${value}`}
-                    </SoundButton>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Discount Input */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Custom {discountType === 'percentage' ? 'Percentage' : 'Amount'}:
-                </label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    placeholder={discountType === 'percentage' ? 'Enter percentage' : 'Enter amount'}
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
-                    className="pr-8"
-                    min="0"
-                    max={discountType === 'percentage' ? "100" : targetAmount.toString()}
-                    step={discountType === 'percentage' ? "1" : "0.01"}
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400">
-                    {discountType === 'percentage' ? '%' : '$'}
+                <Label className="text-sm font-medium text-slate-700 mb-2">Discount Type</Label>
+                <RadioGroup value={discountType} onValueChange={(v) => setDiscountType(v as any)}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="percentage" id="percentage" />
+                    <Label htmlFor="percentage" className="flex items-center gap-2 cursor-pointer">
+                      <Percent className="h-4 w-4" />
+                      Percentage
+                    </Label>
                   </div>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <RadioGroupItem value="fixed" id="fixed" />
+                    <Label htmlFor="fixed" className="flex items-center gap-2 cursor-pointer">
+                      <DollarSign className="h-4 w-4" />
+                      Fixed Amount
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              {/* Discount Value */}
+              <div className="mb-4">
+                <Label className="text-sm font-medium text-slate-700">
+                  Discount Value {discountType === 'percentage' ? '(%)' : '($)'}
+                </Label>
+                <Input
+                  type="number"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  placeholder={discountType === 'percentage' ? "0-100" : "0.00"}
+                  className="mt-1"
+                  autoFocus
+                />
+                
+                {/* Quick discount buttons */}
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {discountType === 'percentage' ? (
+                    [5, 10, 15, 20].map(v => (
+                      <Button
+                        key={v}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDiscountValue(v.toString())}
+                      >
+                        {v}%
+                      </Button>
+                    ))
+                  ) : (
+                    [5, 10, 20, 50].map(v => (
+                      <Button
+                        key={v}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDiscountValue(v.toString())}
+                      >
+                        ${v}
+                      </Button>
+                    ))
+                  )}
                 </div>
               </div>
-
-              {/* Discount Reason */}
+              
+              {/* Reason */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Reason (Optional):
-                </label>
+                <Label className="text-sm font-medium text-slate-700">Reason</Label>
                 <Input
-                  placeholder="e.g., Loyalty customer, Price match, etc."
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g., Customer loyalty, Damaged item, Special promotion"
+                  className="mt-1"
                 />
               </div>
-
-              {/* Manager Override (if needed) */}
-              {showManagerOverride && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm font-medium text-orange-700">Manager Override Required</span>
+              
+              {/* Price Preview */}
+              {currentPrice > 0 && discountValue && (
+                <div className="bg-slate-50 p-3 rounded-lg mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Original Price:</span>
+                    <span className="font-medium">${currentPrice.toFixed(2)}</span>
                   </div>
-                  <Input
-                    placeholder="Enter Manager ID"
-                    value={managerId}
-                    onChange={(e) => setManagerId(e.target.value)}
-                    className="border-orange-300 focus:border-orange-500"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">
-                    Discounts over 30% require manager approval
-                  </p>
-                </motion.div>
-              )}
-
-              {/* Preview */}
-              {preview.savings > 0 && (
-                <div className={`p-4 rounded-lg mb-4 border ${
-                  requiresManagerOverride 
-                    ? 'bg-orange-50 border-orange-200' 
-                    : 'bg-green-50 border-green-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {requiresManagerOverride ? (
-                      <AlertTriangle className="w-4 h-4 text-orange-600" />
-                    ) : (
-                      <Check className="w-4 h-4 text-green-600" />
-                    )}
-                    <span className={`text-sm font-medium ${
-                      requiresManagerOverride ? 'text-orange-700' : 'text-green-700'
-                    }`}>
-                      Discount Preview
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-slate-600">Discount:</span>
+                    <span className="font-medium text-red-600">
+                      -{discountType === 'percentage' 
+                        ? `${discountValue}%` 
+                        : `$${parseFloat(discountValue).toFixed(2)}`}
                     </span>
                   </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span>Discount Amount:</span>
-                      <span className="font-medium">${preview.savings.toFixed(2)} ({preview.percentage.toFixed(1)}%)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>New Total:</span>
-                      <span className="font-bold text-green-600">${preview.newTotal.toFixed(2)}</span>
-                    </div>
+                  <div className="border-t mt-2 pt-2 flex justify-between">
+                    <span className="text-slate-700 font-medium">New Price:</span>
+                    <span className="font-bold text-green-600">
+                      ${calculateDiscountedPrice().toFixed(2)}
+                    </span>
                   </div>
                 </div>
               )}
-
-              {/* Actions */}
+              
+              {/* Manager Approval */}
+              {requiresApproval && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <Label className="text-sm font-medium text-amber-800">
+                    Manager PIN Required (Discount over 20% or $50)
+                  </Label>
+                  <Input
+                    type="password"
+                    value={managerPin}
+                    onChange={(e) => setManagerPin(e.target.value)}
+                    placeholder="Enter manager PIN"
+                    className="mt-2"
+                  />
+                </div>
+              )}
+              
+              {/* Action Buttons */}
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={handleClose}
+                  onClick={onCancel}
                   className="flex-1"
                 >
                   Cancel
                 </Button>
-                <SoundButton
-                  onClick={handleApplyDiscount}
-                  disabled={!discountValue || parseFloat(discountValue) <= 0 || (requiresManagerOverride && !managerId.trim())}
-                  soundType="success"
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white"
+                <Button
+                  onClick={handleApply}
+                  disabled={!discountValue || !reason}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
                 >
                   Apply Discount
-                </SoundButton>
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
