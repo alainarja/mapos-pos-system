@@ -63,6 +63,9 @@ import { CustomerSelector } from "@/components/pos/customer-selector"
 import { CouponDialog, AppliedCoupon } from "@/components/pos/coupon-dialog"
 import { couponService } from "@/lib/services/coupon-service"
 import { useSettingsStore } from "@/stores/settings"
+import { VariantSelectionModal } from "@/components/pos/variant-selection-modal"
+import { groupProductsByVariants, getVariantDisplay } from "@/lib/product-variants"
+import { Product as ProductType, ProductVariant } from "@/types"
 
 interface Product {
   id: string
@@ -285,6 +288,42 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [showCashCount, setShowCashCount] = useState(false)
   const [showCouponDialog, setShowCouponDialog] = useState(false)
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
+  const [showVariantModal, setShowVariantModal] = useState(false)
+  const [selectedProductForVariant, setSelectedProductForVariant] = useState<ProductType | null>(null)
+
+  const handleProductClick = (item: DisplayItem) => {
+    // Check if the item has variants
+    const productWithVariants = item as any
+    if (productWithVariants.variants && productWithVariants.variants.length > 0) {
+      // Show variant selection modal
+      setSelectedProductForVariant(productWithVariants as ProductType)
+      setShowVariantModal(true)
+    } else {
+      // Add directly to cart
+      addToCart(item)
+    }
+  }
+
+  const handleVariantSelect = (product: ProductType, variant: ProductVariant) => {
+    // Create display item from the variant
+    const variantItem: DisplayItem = {
+      id: variant.id,
+      name: variant.name,
+      price: variant.price,
+      category: product.category,
+      image: variant.image || product.image,
+      stock: variant.stock,
+      barcode: variant.barcode,
+      type: 'product',
+      cost: product.cost,
+      taxRate: product.taxRate,
+      taxExempt: product.taxExempt,
+      taxCategory: product.taxCategory
+    }
+    addToCart(variantItem)
+    setShowVariantModal(false)
+    setSelectedProductForVariant(null)
+  }
 
   const addToCart = (item: DisplayItem) => {
     // Log the item being added to debug cost
@@ -541,7 +580,48 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
 
   // Enhanced filtering with additional criteria
   const getEnhancedFilteredProducts = () => {
-    return getAdvancedFilteredProducts()
+    const filteredItems = getAdvancedFilteredProducts()
+    
+    // Group products by variants if they have similar names
+    const products = filteredItems.filter(item => item.type === 'product')
+    const services = filteredItems.filter(item => item.type === 'service')
+    
+    // Convert DisplayItems to ProductType for variant grouping
+    const productsAsProductType: ProductType[] = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      category: p.category,
+      image: p.image || '',
+      stock: p.stock || 0,
+      barcode: p.barcode,
+      cost: p.cost,
+      taxRate: p.taxRate,
+      taxExempt: p.taxExempt,
+      taxCategory: p.taxCategory
+    } as ProductType))
+    
+    // Group products by variants
+    const groupedProducts = groupProductsByVariants(productsAsProductType)
+    
+    // Convert back to DisplayItems
+    const groupedDisplayItems: DisplayItem[] = groupedProducts.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      category: p.category,
+      image: p.image,
+      stock: p.stock,
+      barcode: p.barcode,
+      type: 'product' as const,
+      cost: p.cost,
+      taxRate: p.taxRate,
+      taxExempt: p.taxExempt,
+      taxCategory: p.taxCategory,
+      ...p // Include all other properties including variants
+    }))
+    
+    return [...groupedDisplayItems, ...services]
   }
 
   const filteredProducts = getEnhancedFilteredProducts()
@@ -1867,7 +1947,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                   <div
                     key={item.id}
                     className="cursor-pointer group"
-                    onClick={() => addToCart(item)}
+                    onClick={() => handleProductClick(item)}
                   >
                     <Card className={`bg-white/80 backdrop-blur-sm shadow-[0_6px_20px_rgba(139,92,246,0.1)] hover:shadow-[0_12px_30px_rgba(139,92,246,0.2)] transition-all duration-300 hover:scale-105 ${
                       item.type === 'service' ? 'border-blue-200' : 'border-purple-100'
@@ -1893,6 +1973,11 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                                 Product
                               </Badge>
                             )}
+                            {(item as any).variants && (item as any).variants.length > 0 && (
+                              <Badge className="text-xs px-2 py-1 bg-indigo-500 text-white">
+                                {(item as any).variants.length} Variants
+                              </Badge>
+                            )}
                           </div>
                           {/* Duration Indicator for Services only */}
                           {item.type === 'service' && item.duration && (
@@ -1906,6 +1991,11 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                         <h3 className="font-semibold text-sm mb-1 line-clamp-2 text-slate-800">
                           {item.name}
                         </h3>
+                        {(item as any).variants && (item as any).variants.length > 0 && (
+                          <p className="text-xs text-indigo-600 mb-1">
+                            {(item as any).variants.map((v: any) => v.variantValue).join(', ')}
+                          </p>
+                        )}
                         {item.description && item.type === 'service' && (
                           <p className="text-xs text-gray-500 mb-1 line-clamp-1">{item.description}</p>
                         )}
@@ -1915,7 +2005,15 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                         <div className="flex items-center justify-between mb-1">
                           <div>
                             <p className={`font-bold text-base ${item.type === 'service' ? 'text-blue-600' : 'text-purple-600'}`}>
-                              ${item.price.toFixed(2)}
+                              {(item as any).variants && (item as any).variants.length > 1 && 
+                               (item as any).variants.some((v: any) => v.price !== item.price) ? (
+                                <span className="text-sm">
+                                  ${Math.min(...(item as any).variants.map((v: any) => v.price)).toFixed(2)} - 
+                                  ${Math.max(...(item as any).variants.map((v: any) => v.price)).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span>${item.price.toFixed(2)}</span>
+                              )}
                             </p>
                           </div>
                           <div className="text-xs">
@@ -4120,6 +4218,18 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
           calculateTotals()
         }}
         appliedCoupon={appliedCoupon}
+      />
+      
+      {/* Variant Selection Modal */}
+      <VariantSelectionModal
+        product={selectedProductForVariant}
+        isOpen={showVariantModal}
+        onClose={() => {
+          setShowVariantModal(false)
+          setSelectedProductForVariant(null)
+        }}
+        onVariantSelect={handleVariantSelect}
+        isDarkMode={false}
       />
     </div>
   )

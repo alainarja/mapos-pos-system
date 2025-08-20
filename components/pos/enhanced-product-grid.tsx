@@ -18,7 +18,8 @@ import {
   Eye,
   EyeOff,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Layers
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -217,6 +218,16 @@ export function EnhancedProductGrid({
       )
     }
     
+    // Variant indicator
+    if (product.variants && product.variants.length > 0) {
+      tags.push(
+        <Badge key="variants" variant="secondary" className="text-xs flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+          <Layers className="w-3 h-3" />
+          {product.variants.length} Variants
+        </Badge>
+      )
+    }
+    
     // High profit margin tag
     if (profitMargin && parseFloat(profitMargin) > 50) {
       tags.push(
@@ -332,11 +343,20 @@ export function EnhancedProductGrid({
               <div className="space-y-2">
                 {/* Product Name & Quick Actions */}
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className={`font-semibold text-sm line-clamp-2 leading-tight flex-1 ${
-                    isDarkMode ? "text-slate-200" : "text-slate-800"
-                  }`}>
-                    {product.name}
-                  </h3>
+                  <div className="flex-1">
+                    <h3 className={`font-semibold text-sm line-clamp-2 leading-tight ${
+                      isDarkMode ? "text-slate-200" : "text-slate-800"
+                    }`}>
+                      {product.name}
+                    </h3>
+                    {product.variants && product.variants.length > 0 && (
+                      <p className={`text-xs mt-1 ${
+                        isDarkMode ? "text-indigo-400" : "text-indigo-600"
+                      }`}>
+                        {product.variants.map(v => v.variantValue).join(', ')}
+                      </p>
+                    )}
+                  </div>
                   {enableQuickActions && showDetailedInfo && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <TooltipProvider>
@@ -426,7 +446,15 @@ export function EnhancedProductGrid({
                       <p className={`font-bold text-lg ${
                         isDarkMode ? "text-purple-400" : "text-purple-600"
                       }`}>
-                        ${product.price.toFixed(2)}
+                        {product.variants && product.variants.length > 1 && 
+                         product.variants.some(v => v.price !== product.price) ? (
+                          <span className="text-sm">
+                            ${Math.min(...product.variants.map(v => v.price)).toFixed(2)} - 
+                            ${Math.max(...product.variants.map(v => v.price)).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span>${product.price.toFixed(2)}</span>
+                        )}
                       </p>
                       {product.unit && (
                         <span className={`text-xs ${

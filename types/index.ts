@@ -42,6 +42,25 @@ export interface Product {
   taxRate?: number // Tax rate as decimal (e.g., 0.08 for 8%)
   taxExempt?: boolean // Whether this item is tax exempt
   taxCategory?: string // Tax category for different tax types
+  // Variant properties
+  variantGroup?: string // Base product name without variant info (e.g., "T-Shirt")
+  variantAttribute?: string // Variant type (e.g., "Color", "Size")
+  variantValue?: string // Variant value (e.g., "Red", "Large")
+  variants?: ProductVariant[] // List of variants for this product group
+  isVariant?: boolean // Whether this product is a variant
+  parentProductId?: string // ID of the parent product if this is a variant
+}
+
+export interface ProductVariant {
+  id: string
+  name: string
+  variantAttribute: string
+  variantValue: string
+  price: number
+  stock: number
+  image: string
+  sku?: string
+  barcode?: string
 }
 
 export interface Category {
