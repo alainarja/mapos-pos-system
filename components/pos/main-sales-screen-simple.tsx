@@ -52,13 +52,14 @@ import { useNotificationStore } from "@/stores/notifications"
 import { useUserStore } from "@/stores/user"
 import { useCashManagementStore } from "@/stores/cash-management"
 import { usePrintStore } from "@/stores/print"
-import { CouponInput } from "@/components/pos/coupon-input"
 import { ReturnsExchange } from "@/components/pos/returns-exchange"
 import { ReturnsIntegrationProvider } from "@/components/pos/returns-integration"
 import { CashCountDialog } from "@/components/cash/cash-count-dialog"
 import { MixedCurrencyPayment, PaymentDetails } from "@/components/pos/mixed-currency-payment"
 import { DiscountDialog, DiscountDetails } from "@/components/pos/discount-dialog"
 import { CustomerSelector } from "@/components/pos/customer-selector"
+import { CouponDialog, AppliedCoupon } from "@/components/pos/coupon-dialog"
+import { couponService } from "@/lib/services/coupon-service"
 import { useSettingsStore } from "@/stores/settings"
 
 interface Product {
@@ -278,6 +279,8 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [expenseCategory, setExpenseCategory] = useState('general')
   const [expenseCurrency, setExpenseCurrency] = useState<'USD' | 'LBP'>('USD')
   const [showCashCount, setShowCashCount] = useState(false)
+  const [showCouponDialog, setShowCouponDialog] = useState(false)
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
 
   const addToCart = (item: DisplayItem) => {
     // Log the item being added to debug cost
@@ -815,6 +818,9 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
     console.log('🔄 currentUser:', currentUser)
     console.log('🔄 cart.length:', cart.length)
     
+    // Calculate final total with coupon discount
+    const finalTotal = total - (appliedCoupon?.discountAmount || 0)
+    
     // Play success sound
     playSuccess()
     
@@ -827,7 +833,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
           id: Date.now().toString(),
           type: 'success',
           title: '🎓 Training Mode - Sale Simulated',
-          message: `Practice sale of $${total.toFixed(2)} with ${paymentMethod}`,
+          message: `Practice sale of $${finalTotal.toFixed(2)} with ${paymentMethod}`,
           timestamp: new Date(),
           isRead: false
         })
@@ -876,7 +882,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         id: Date.now().toString(),
         type: 'info',
         title: 'Processing Sale',
-        message: `Processing payment of $${total.toFixed(2)}...`,
+        message: `Processing payment of $${finalTotal.toFixed(2)}...`,
         timestamp: new Date(),
         isRead: false
       })
@@ -894,6 +900,20 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
       )
 
       if (result.success) {
+        // Apply coupon to the inventory system if there's one
+        if (appliedCoupon) {
+          await couponService.applyCoupon(
+            appliedCoupon.code,
+            finalTotal,
+            result.saleId || Date.now().toString(),
+            {
+              cashier: currentUser?.username || "Store Cashier",
+              warehouseId: userWarehouseId,
+              items: cart.length,
+              timestamp: new Date().toISOString()
+            }
+          )
+        }
         // Create local transaction record for UI
         const transaction = {
           id: result.saleId || Date.now().toString(),
@@ -923,7 +943,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
           id: Date.now().toString(),
           type: 'success',
           title: 'Payment Successful',
-          message: result.message || `Payment of $${total.toFixed(2)} completed with ${paymentMethod}`,
+          message: result.message || `Payment of $${finalTotal.toFixed(2)} completed with ${paymentMethod}`,
           timestamp: new Date(),
           isRead: false
         })
@@ -932,6 +952,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         setShowPaymentDialog(false)
         setReferralCode('')
         setAppliedReferral(null)
+        setAppliedCoupon(null)
         setShowCashCalculator(false)
         setAmountTendered('')
         // Note: clearCart() is called in processSale on success
@@ -2030,6 +2051,12 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                       <span className="text-green-600">-${totalSavings.toFixed(2)}</span>
                     </div>
                   )}
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-sm font-medium">
+                      <span className="text-purple-600">Coupon ({appliedCoupon.code}):</span>
+                      <span className="text-purple-600">-${appliedCoupon.discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   {appliedCoupons.length > 0 && (
                     <div className="space-y-1">
                       {appliedCoupons.map((coupon) => (
@@ -2046,7 +2073,9 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t border-purple-200">
                     <span className="text-slate-800">Total:</span>
-                    <span className="text-purple-600">${total.toFixed(2)}</span>
+                    <span className="text-purple-600">
+                      ${(total - (appliedCoupon?.discountAmount || 0)).toFixed(2)}
+                    </span>
                   </div>
                 </div>
 
@@ -2104,16 +2133,47 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                   )}
                 </div>
 
-                {/* Coupon Input */}
+                {/* Coupon Section */}
                 <div className="pt-4 border-t border-purple-200/30">
-                  <CouponInput
-                    onApplyCoupon={handleApplyCoupon}
-                    onRemoveCoupon={handleRemoveCoupon}
-                    appliedCoupons={appliedCoupons}
-                    validationError={couponValidationError}
-                    isDarkMode={false}
-                    disabled={cart.length === 0}
-                  />
+                  {appliedCoupon ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Tag className="h-4 w-4 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800">
+                              Coupon Applied: {appliedCoupon.code}
+                            </p>
+                            <p className="text-xs text-green-600">
+                              {appliedCoupon.discountType === 'percent' 
+                                ? `${appliedCoupon.discountValue}% off` 
+                                : `$${appliedCoupon.discountValue} off`}
+                              {' '}- Saved ${appliedCoupon.discountAmount.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAppliedCoupon(null)}
+                          className="text-red-600 hover:bg-red-50 p-1"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => setShowCouponDialog(true)}
+                      variant="outline"
+                      size="sm"
+                      disabled={cart.length === 0}
+                      className="w-full h-9 border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      <Tag className="h-4 w-4 mr-2" />
+                      Apply Coupon Code
+                    </Button>
+                  )}
                 </div>
 
                 {/* Referral Code Input */}
@@ -3812,14 +3872,16 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
       <CashCountDialog
         isOpen={showCashCount}
         onClose={() => setShowCashCount(false)}
-        expectedAmount={safeCurrentDrawerAmountUsd}
+        expectedAmountUsd={safeCurrentDrawerAmountUsd}
+        expectedAmountLbp={safeCurrentDrawerAmountLbp}
         cashier={user || "Unknown"}
+        exchangeRate={settings.currency.exchangeRate || 89500}
       />
       
       {/* Mixed Currency Payment Dialog */}
       {showMixedPayment && (
         <MixedCurrencyPayment
-          total={total}
+          total={total - (appliedCoupon?.discountAmount || 0)}
           onComplete={handleMixedPayment}
           onCancel={() => setShowMixedPayment(false)}
         />
@@ -3968,6 +4030,19 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
           }}
         />
       )}
+
+      {/* Coupon Dialog */}
+      <CouponDialog
+        isOpen={showCouponDialog}
+        onClose={() => setShowCouponDialog(false)}
+        subtotal={subtotal}
+        onApplyCoupon={(coupon) => {
+          setAppliedCoupon(coupon)
+          // Recalculate totals with coupon discount
+          calculateTotals()
+        }}
+        appliedCoupon={appliedCoupon}
+      />
     </div>
   )
 }
