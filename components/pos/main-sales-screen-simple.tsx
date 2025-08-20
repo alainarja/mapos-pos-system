@@ -167,12 +167,14 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   } = useInventoryStore()
   
   const {
-    currentDrawerAmount,
+    currentDrawerAmountUsd,
+    currentDrawerAmountLbp,
     addExpense,
     getTodaysExpenses,
     getTotalExpensesToday,
     cashCounts,
-    getLatestCashCount
+    getLatestCashCount,
+    addSaleToDrawer
   } = useCashManagementStore()
   
   const { printCashDrawerReport, loadCompanyInfo, refreshCompanyInfo, isLoadingCompanyInfo } = usePrintStore()
@@ -274,6 +276,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [expenseDescription, setExpenseDescription] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('general')
+  const [expenseCurrency, setExpenseCurrency] = useState<'USD' | 'LBP'>('USD')
   const [showCashCount, setShowCashCount] = useState(false)
 
   const addToCart = (item: DisplayItem) => {
@@ -336,15 +339,18 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
     const expenseData = {
       description: expenseDescription.trim(),
       amount: parseFloat(expenseAmount),
+      currency: expenseCurrency,
       category: expenseCategory,
       cashier: user || 'Unknown'
     }
 
-    addExpense(expenseData)
+    // Pass current exchange rate
+    addExpense(expenseData, settings.currency.exchangeRate)
 
     setExpenseDescription('')
     setExpenseAmount('')
     setExpenseCategory('general')
+    setExpenseCurrency('USD')
     setShowAddExpense(false)
     playSuccess()
 
@@ -759,6 +765,12 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const handleMixedPayment = async (paymentDetails: PaymentDetails) => {
     // Process mixed currency payment
     const paymentMethod = `Mixed: $${paymentDetails.usdAmount.toFixed(2)} USD + ${paymentDetails.lbpAmount.toLocaleString()} LBP`
+    
+    // Update cash drawer with both currencies
+    if (paymentDetails.method.includes('Cash')) {
+      addSaleToDrawer(paymentDetails.usdAmount, paymentDetails.lbpAmount)
+    }
+    
     await completeSale(paymentMethod)
     setShowMixedPayment(false)
   }
@@ -1225,8 +1237,9 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   // Safe cart calculations with defaults - subtotal is already imported from cart store
 
   // Safe function results with defaults
-  const safeCurrentDrawerAmount = typeof currentDrawerAmount === 'number' ? currentDrawerAmount : 0
-  const safeTotalExpensesToday = typeof getTotalExpensesToday === 'function' ? (getTotalExpensesToday() || 0) : 0
+  const safeCurrentDrawerAmountUsd = typeof currentDrawerAmountUsd === 'number' ? currentDrawerAmountUsd : 0
+  const safeCurrentDrawerAmountLbp = typeof currentDrawerAmountLbp === 'number' ? currentDrawerAmountLbp : 0
+  const safeTotalExpensesToday = typeof getTotalExpensesToday === 'function' ? getTotalExpensesToday() : { usd: 0, lbp: 0 }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50 text-slate-900">
@@ -2256,6 +2269,8 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                     <Button
                       onClick={async () => {
                         if (parseFloat(amountTendered) >= total) {
+                          // Add cash sale to drawer (USD only for regular cash payment)
+                          addSaleToDrawer(total, 0)
                           await completeSale("Cash")
                           setShowCashCalculator(false)
                           setShowPaymentDialog(false)
@@ -2354,9 +2369,15 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
               {/* Cash Drawer Section */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-gray-800">Cash Drawer</h3>
-                <div className="bg-emerald-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Current Drawer</p>
-                  <p className="text-2xl font-bold text-emerald-600">${safeCurrentDrawerAmount.toFixed(2)}</p>
+                <div className="bg-emerald-50 p-4 rounded-lg space-y-2">
+                  <div>
+                    <p className="text-sm text-gray-600">USD Balance</p>
+                    <p className="text-2xl font-bold text-emerald-600">${safeCurrentDrawerAmountUsd.toFixed(2)}</p>
+                  </div>
+                  <div className="border-t pt-2">
+                    <p className="text-sm text-gray-600">LBP Balance</p>
+                    <p className="text-2xl font-bold text-purple-600">{safeCurrentDrawerAmountLbp.toLocaleString()} L.L.</p>
+                  </div>
                 </div>
                 <Button 
                   className="w-full bg-emerald-600 hover:bg-emerald-700"
@@ -2396,11 +2417,19 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                 </div>
                 
                 {/* Today's Expenses Summary */}
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Today's Expenses</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    ${safeTotalExpensesToday.toFixed(2)}
-                  </p>
+                <div className="bg-red-50 p-4 rounded-lg space-y-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Today's USD Expenses</p>
+                    <p className="text-xl font-bold text-red-600">
+                      ${safeTotalExpensesToday.usd.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="border-t pt-2">
+                    <p className="text-sm text-gray-600">Today's LBP Expenses</p>
+                    <p className="text-xl font-bold text-orange-600">
+                      {safeTotalExpensesToday.lbp.toLocaleString()} L.L.
+                    </p>
+                  </div>
                 </div>
                 
                 {/* Recent Expenses */}
@@ -2412,7 +2441,11 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                         <p className="text-xs text-gray-500">{expense.category}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-red-600">${(expense.amount || 0).toFixed(2)}</p>
+                        <p className="font-semibold text-red-600">
+                          {expense.currency === 'USD' 
+                            ? `$${(expense.amount || 0).toFixed(2)}`
+                            : `${(expense.amount || 0).toLocaleString()} L.L.`}
+                        </p>
                         <p className="text-xs text-gray-500">
                           {expense.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>
@@ -2443,6 +2476,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                   setExpenseDescription('')
                   setExpenseAmount('')
                   setExpenseCategory('general')
+                  setExpenseCurrency('USD')
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -2463,15 +2497,26 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
               
               <div>
                 <Label htmlFor="expense-amount">Amount</Label>
-                <Input
-                  id="expense-amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="expense-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    className="flex-1"
+                  />
+                  <select
+                    value={expenseCurrency}
+                    onChange={(e) => setExpenseCurrency(e.target.value as 'USD' | 'LBP')}
+                    className="px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="LBP">LBP</option>
+                  </select>
+                </div>
               </div>
               
               <div>
@@ -2502,6 +2547,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                     setExpenseDescription('')
                     setExpenseAmount('')
                     setExpenseCategory('general')
+                    setExpenseCurrency('USD')
                   }}
                 >
                   Cancel

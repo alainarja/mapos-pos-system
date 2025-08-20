@@ -5,16 +5,20 @@ export interface Expense {
   id: string
   description: string
   amount: number
+  currency: 'USD' | 'LBP'
+  amountInUsd?: number // Calculated USD equivalent
   category: string
   timestamp: Date
   cashier?: string
+  exchangeRate?: number // Rate at time of expense
 }
 
 export interface CashCount {
   id: string
   timestamp: Date
   cashier: string
-  denominations: {
+  // USD Denominations
+  usdDenominations: {
     hundreds: number
     fifties: number
     twenties: number
@@ -26,31 +30,59 @@ export interface CashCount {
     nickels: number
     pennies: number
   }
-  totalCounted: number
-  expectedAmount: number
-  variance: number
+  // LBP Denominations
+  lbpDenominations: {
+    millions: number       // 1,000,000
+    fiveHundredThousands: number // 500,000
+    twoFiftyThousands: number    // 250,000
+    hundredThousands: number      // 100,000
+    fiftyThousands: number        // 50,000
+    twentyThousands: number       // 20,000
+    tenThousands: number          // 10,000
+    fiveThousands: number         // 5,000
+    thousands: number             // 1,000
+    fiveHundreds: number          // 500
+  }
+  totalCountedUsd: number
+  totalCountedLbp: number
+  expectedAmountUsd: number
+  expectedAmountLbp: number
+  varianceUsd: number
+  varianceLbp: number
+  exchangeRate: number
   notes?: string
 }
 
 export interface CashDrawerReport {
   id: string
   date: string
-  openingBalance: number
-  closingBalance: number
-  cashSales: number
-  expenses: number
-  deposits: number
-  withdrawals: number
-  variance: number
+  openingBalanceUsd: number
+  openingBalanceLbp: number
+  closingBalanceUsd: number
+  closingBalanceLbp: number
+  cashSalesUsd: number
+  cashSalesLbp: number
+  mixedPaymentSales: number // Total in USD
+  expensesUsd: number
+  expensesLbp: number
+  depositsUsd: number
+  depositsLbp: number
+  withdrawalsUsd: number
+  withdrawalsLbp: number
+  varianceUsd: number
+  varianceLbp: number
+  exchangeRate: number
   cashCounts: CashCount[]
   expenses_list: Expense[]
   timestamp: Date
 }
 
 interface CashManagementState {
-  // Cash drawer state
-  currentDrawerAmount: number
-  openingBalance: number
+  // Cash drawer state - Dual Currency
+  currentDrawerAmountUsd: number
+  currentDrawerAmountLbp: number
+  openingBalanceUsd: number
+  openingBalanceLbp: number
   
   // Expenses
   expenses: Expense[]
@@ -62,28 +94,29 @@ interface CashManagementState {
   dailyReports: CashDrawerReport[]
   
   // Actions - Expenses
-  addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => void
+  addExpense: (expense: Omit<Expense, 'id' | 'timestamp' | 'amountInUsd'>, exchangeRate: number) => void
   removeExpense: (id: string) => void
   getTodaysExpenses: () => Expense[]
-  getTotalExpensesToday: () => number
+  getTotalExpensesToday: () => { usd: number, lbp: number }
   
   // Actions - Cash Drawer
-  setOpeningBalance: (amount: number) => void
-  updateDrawerAmount: (amount: number) => void
+  setOpeningBalance: (amountUsd: number, amountLbp: number) => void
+  updateDrawerAmount: (amountUsd: number, amountLbp: number, isAddition?: boolean) => void
+  addSaleToDrawer: (amountUsd: number, amountLbp: number) => void
   
   // Actions - Cash Count
   addCashCount: (count: Omit<CashCount, 'id' | 'timestamp'>) => void
   getLatestCashCount: () => CashCount | null
   
   // Actions - Reports
-  generateDailyReport: () => CashDrawerReport
+  generateDailyReport: (exchangeRate: number) => CashDrawerReport
   getDailyReport: (date: string) => CashDrawerReport | null
   
   // Utility actions
   clearOldData: (daysToKeep?: number) => void
 }
 
-const calculateTotal = (denominations: CashCount['denominations']): number => {
+const calculateTotalUsd = (denominations: CashCount['usdDenominations']): number => {
   return (
     denominations.hundreds * 100 +
     denominations.fifties * 50 +
@@ -98,40 +131,75 @@ const calculateTotal = (denominations: CashCount['denominations']): number => {
   )
 }
 
+const calculateTotalLbp = (denominations: CashCount['lbpDenominations']): number => {
+  return (
+    denominations.millions * 1000000 +
+    denominations.fiveHundredThousands * 500000 +
+    denominations.twoFiftyThousands * 250000 +
+    denominations.hundredThousands * 100000 +
+    denominations.fiftyThousands * 50000 +
+    denominations.twentyThousands * 20000 +
+    denominations.tenThousands * 10000 +
+    denominations.fiveThousands * 5000 +
+    denominations.thousands * 1000 +
+    denominations.fiveHundreds * 500
+  )
+}
+
 export const useCashManagementStore = create<CashManagementState>()(
   persist(
     (set, get) => ({
-      // Initial state
-      currentDrawerAmount: 200.00, // Starting cash
-      openingBalance: 200.00,
+      // Initial state - Dual Currency
+      currentDrawerAmountUsd: 200.00, // Starting USD cash
+      currentDrawerAmountLbp: 5000000, // Starting LBP cash (5 million)
+      openingBalanceUsd: 200.00,
+      openingBalanceLbp: 5000000,
       expenses: [],
       cashCounts: [],
       dailyReports: [],
 
       // Expense actions
-      addExpense: (expenseData) => {
+      addExpense: (expenseData, exchangeRate) => {
         const expense: Expense = {
           ...expenseData,
           id: `EXP-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          timestamp: new Date()
+          timestamp: new Date(),
+          exchangeRate,
+          amountInUsd: expenseData.currency === 'USD' 
+            ? expenseData.amount 
+            : expenseData.amount / exchangeRate
         }
         
-        const { expenses, currentDrawerAmount } = get()
+        const { expenses, currentDrawerAmountUsd, currentDrawerAmountLbp } = get()
         
-        set({
-          expenses: [expense, ...expenses],
-          currentDrawerAmount: currentDrawerAmount - expense.amount
-        })
+        if (expense.currency === 'USD') {
+          set({
+            expenses: [expense, ...expenses],
+            currentDrawerAmountUsd: currentDrawerAmountUsd - expense.amount
+          })
+        } else {
+          set({
+            expenses: [expense, ...expenses],
+            currentDrawerAmountLbp: currentDrawerAmountLbp - expense.amount
+          })
+        }
       },
 
       removeExpense: (id) => {
         const { expenses } = get()
         const expense = expenses.find(e => e.id === id)
         if (expense) {
-          set({
-            expenses: expenses.filter(e => e.id !== id),
-            currentDrawerAmount: get().currentDrawerAmount + expense.amount
-          })
+          if (expense.currency === 'USD') {
+            set({
+              expenses: expenses.filter(e => e.id !== id),
+              currentDrawerAmountUsd: get().currentDrawerAmountUsd + expense.amount
+            })
+          } else {
+            set({
+              expenses: expenses.filter(e => e.id !== id),
+              currentDrawerAmountLbp: get().currentDrawerAmountLbp + expense.amount
+            })
+          }
         }
       },
 
@@ -145,39 +213,63 @@ export const useCashManagementStore = create<CashManagementState>()(
 
       getTotalExpensesToday: () => {
         const todaysExpenses = get().getTodaysExpenses()
-        return todaysExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+        return {
+          usd: todaysExpenses
+            .filter(e => e.currency === 'USD')
+            .reduce((sum, expense) => sum + expense.amount, 0),
+          lbp: todaysExpenses
+            .filter(e => e.currency === 'LBP')
+            .reduce((sum, expense) => sum + expense.amount, 0)
+        }
       },
 
       // Cash drawer actions
-      setOpeningBalance: (amount) => {
-        set({ 
-          openingBalance: amount,
-          currentDrawerAmount: amount
+      setOpeningBalance: (amountUsd, amountLbp) => {
+        set({
+          openingBalanceUsd: amountUsd,
+          openingBalanceLbp: amountLbp,
+          currentDrawerAmountUsd: amountUsd,
+          currentDrawerAmountLbp: amountLbp
         })
       },
 
-      updateDrawerAmount: (amount) => {
-        set({ currentDrawerAmount: amount })
+      updateDrawerAmount: (amountUsd, amountLbp, isAddition = true) => {
+        const { currentDrawerAmountUsd, currentDrawerAmountLbp } = get()
+        if (isAddition) {
+          set({
+            currentDrawerAmountUsd: currentDrawerAmountUsd + amountUsd,
+            currentDrawerAmountLbp: currentDrawerAmountLbp + amountLbp
+          })
+        } else {
+          set({
+            currentDrawerAmountUsd: currentDrawerAmountUsd - amountUsd,
+            currentDrawerAmountLbp: currentDrawerAmountLbp - amountLbp
+          })
+        }
+      },
+
+      addSaleToDrawer: (amountUsd, amountLbp) => {
+        const { currentDrawerAmountUsd, currentDrawerAmountLbp } = get()
+        set({
+          currentDrawerAmountUsd: currentDrawerAmountUsd + amountUsd,
+          currentDrawerAmountLbp: currentDrawerAmountLbp + amountLbp
+        })
       },
 
       // Cash count actions
       addCashCount: (countData) => {
-        const totalCounted = calculateTotal(countData.denominations)
-        const variance = totalCounted - countData.expectedAmount
-        
         const cashCount: CashCount = {
           ...countData,
-          id: `COUNT-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          id: `CC-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           timestamp: new Date(),
-          totalCounted,
-          variance
+          totalCountedUsd: calculateTotalUsd(countData.usdDenominations),
+          totalCountedLbp: calculateTotalLbp(countData.lbpDenominations),
+          varianceUsd: calculateTotalUsd(countData.usdDenominations) - countData.expectedAmountUsd,
+          varianceLbp: calculateTotalLbp(countData.lbpDenominations) - countData.expectedAmountLbp
         }
         
-        const { cashCounts } = get()
-        
         set({
-          cashCounts: [cashCount, ...cashCounts],
-          currentDrawerAmount: totalCounted
+          cashCounts: [cashCount, ...get().cashCounts]
         })
       },
 
@@ -187,50 +279,66 @@ export const useCashManagementStore = create<CashManagementState>()(
       },
 
       // Report actions
-      generateDailyReport: () => {
-        const state = get()
-        const today = new Date().toISOString().split('T')[0]
-        const todaysExpenses = state.getTodaysExpenses()
-        const todaysCounts = state.cashCounts.filter(count =>
-          new Date(count.timestamp).toDateString() === new Date().toDateString()
+      generateDailyReport: (exchangeRate) => {
+        const { 
+          openingBalanceUsd, 
+          openingBalanceLbp,
+          currentDrawerAmountUsd,
+          currentDrawerAmountLbp,
+          cashCounts,
+          expenses 
+        } = get()
+        
+        const today = new Date().toDateString()
+        const todaysCashCounts = cashCounts.filter(
+          cc => new Date(cc.timestamp).toDateString() === today
+        )
+        const todaysExpenses = expenses.filter(
+          e => new Date(e.timestamp).toDateString() === today
         )
         
-        // Calculate cash sales from transaction store if available
-        let cashSales = 0
-        try {
-          const transactionStore = localStorage.getItem('transaction-store')
-          if (transactionStore) {
-            const data = JSON.parse(transactionStore)
-            const transactions = data?.state?.transactions || []
-            const todaysTransactions = transactions.filter((t: any) => 
-              t.date === today && t.paymentMethod === 'Cash'
-            )
-            cashSales = todaysTransactions.reduce((sum: number, t: any) => sum + t.total, 0)
-          }
-        } catch (error) {
-          console.warn('Could not calculate cash sales:', error)
-        }
-
+        const totalExpensesUsd = todaysExpenses
+          .filter(e => e.currency === 'USD')
+          .reduce((sum, e) => sum + e.amount, 0)
+        const totalExpensesLbp = todaysExpenses
+          .filter(e => e.currency === 'LBP')
+          .reduce((sum, e) => sum + e.amount, 0)
+        
+        const cashSalesUsd = currentDrawerAmountUsd - openingBalanceUsd + totalExpensesUsd
+        const cashSalesLbp = currentDrawerAmountLbp - openingBalanceLbp + totalExpensesLbp
+        
+        const latestCount = todaysCashCounts[0]
+        const varianceUsd = latestCount ? latestCount.varianceUsd : 0
+        const varianceLbp = latestCount ? latestCount.varianceLbp : 0
+        
         const report: CashDrawerReport = {
-          id: `REPORT-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          id: `CDR-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           date: today,
-          openingBalance: state.openingBalance,
-          closingBalance: state.currentDrawerAmount,
-          cashSales,
-          expenses: todaysExpenses.reduce((sum, e) => sum + e.amount, 0),
-          deposits: 0, // TODO: Add deposit tracking
-          withdrawals: 0, // TODO: Add withdrawal tracking
-          variance: state.currentDrawerAmount - (state.openingBalance + cashSales - todaysExpenses.reduce((sum, e) => sum + e.amount, 0)),
-          cashCounts: todaysCounts,
+          openingBalanceUsd,
+          openingBalanceLbp,
+          closingBalanceUsd: currentDrawerAmountUsd,
+          closingBalanceLbp: currentDrawerAmountLbp,
+          cashSalesUsd,
+          cashSalesLbp,
+          mixedPaymentSales: 0, // Will be calculated from actual sales
+          expensesUsd: totalExpensesUsd,
+          expensesLbp: totalExpensesLbp,
+          depositsUsd: 0,
+          depositsLbp: 0,
+          withdrawalsUsd: 0,
+          withdrawalsLbp: 0,
+          varianceUsd,
+          varianceLbp,
+          exchangeRate,
+          cashCounts: todaysCashCounts,
           expenses_list: todaysExpenses,
           timestamp: new Date()
         }
-
-        const { dailyReports } = state
+        
         set({
-          dailyReports: [report, ...dailyReports.filter(r => r.date !== today)]
+          dailyReports: [report, ...get().dailyReports]
         })
-
+        
         return report
       },
 
@@ -244,81 +352,15 @@ export const useCashManagementStore = create<CashManagementState>()(
         const cutoffDate = new Date()
         cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
         
-        const { expenses, cashCounts, dailyReports } = get()
-        
         set({
-          expenses: expenses.filter(e => new Date(e.timestamp) >= cutoffDate),
-          cashCounts: cashCounts.filter(c => new Date(c.timestamp) >= cutoffDate),
-          dailyReports: dailyReports.filter(r => new Date(r.date) >= cutoffDate)
+          expenses: get().expenses.filter(e => new Date(e.timestamp) > cutoffDate),
+          cashCounts: get().cashCounts.filter(cc => new Date(cc.timestamp) > cutoffDate),
+          dailyReports: get().dailyReports.filter(r => new Date(r.timestamp) > cutoffDate)
         })
       }
     }),
     {
-      name: 'cash-management-store',
-      // Custom storage with proper date serialization
-      storage: {
-        getItem: (name) => {
-          const str = localStorage.getItem(name)
-          if (!str) return null
-          const data = JSON.parse(str)
-          
-          // Convert date strings back to Date objects
-          if (data?.state?.expenses) {
-            data.state.expenses = data.state.expenses.map((e: any) => ({
-              ...e,
-              timestamp: new Date(e.timestamp)
-            }))
-          }
-          if (data?.state?.cashCounts) {
-            data.state.cashCounts = data.state.cashCounts.map((c: any) => ({
-              ...c,
-              timestamp: new Date(c.timestamp)
-            }))
-          }
-          if (data?.state?.dailyReports) {
-            data.state.dailyReports = data.state.dailyReports.map((r: any) => ({
-              ...r,
-              timestamp: new Date(r.timestamp),
-              expenses_list: r.expenses_list ? r.expenses_list.map((e: any) => ({
-                ...e,
-                timestamp: new Date(e.timestamp)
-              })) : []
-            }))
-          }
-          
-          return data
-        },
-        setItem: (name, value) => {
-          // Convert Date objects to strings before saving
-          const data = {
-            ...value,
-            state: {
-              ...value.state,
-              expenses: value.state.expenses.map((e: any) => ({
-                ...e,
-                timestamp: e.timestamp instanceof Date ? e.timestamp.toISOString() : e.timestamp
-              })),
-              cashCounts: value.state.cashCounts.map((c: any) => ({
-                ...c,
-                timestamp: c.timestamp instanceof Date ? c.timestamp.toISOString() : c.timestamp
-              })),
-              dailyReports: value.state.dailyReports.map((r: any) => ({
-                ...r,
-                timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp,
-                expenses_list: r.expenses_list ? r.expenses_list.map((e: any) => ({
-                  ...e,
-                  timestamp: e.timestamp instanceof Date ? e.timestamp.toISOString() : e.timestamp
-                })) : []
-              }))
-            }
-          }
-          
-          localStorage.setItem(name, JSON.stringify(data))
-        },
-        removeItem: (name) => {
-          localStorage.removeItem(name)
-        }
-      }
+      name: 'cash-management-storage'
     }
   )
 )
