@@ -96,7 +96,11 @@ interface CashManagementState {
   // Actions - Expenses
   addExpense: (expense: Omit<Expense, 'id' | 'timestamp' | 'amountInUsd'>, exchangeRate: number) => void
   removeExpense: (id: string) => void
+  removeMultipleExpenses: (ids: string[]) => void
+  clearAllExpenses: () => void
   getTodaysExpenses: () => Expense[]
+  getAllExpenses: () => Expense[]
+  getExpensesByDateRange: (startDate: Date, endDate: Date) => Expense[]
   getTotalExpensesToday: () => { usd: number, lbp: number }
   
   // Actions - Cash Drawer
@@ -203,12 +207,67 @@ export const useCashManagementStore = create<CashManagementState>()(
         }
       },
 
+      removeMultipleExpenses: (ids) => {
+        const { expenses, currentDrawerAmountUsd, currentDrawerAmountLbp } = get()
+        const expensesToRemove = expenses.filter(e => ids.includes(e.id))
+        
+        let usdRefund = 0
+        let lbpRefund = 0
+        
+        expensesToRemove.forEach(expense => {
+          if (expense.currency === 'USD') {
+            usdRefund += expense.amount
+          } else {
+            lbpRefund += expense.amount
+          }
+        })
+        
+        set({
+          expenses: expenses.filter(e => !ids.includes(e.id)),
+          currentDrawerAmountUsd: currentDrawerAmountUsd + usdRefund,
+          currentDrawerAmountLbp: currentDrawerAmountLbp + lbpRefund
+        })
+      },
+
+      clearAllExpenses: () => {
+        const { expenses, currentDrawerAmountUsd, currentDrawerAmountLbp } = get()
+        
+        let usdRefund = 0
+        let lbpRefund = 0
+        
+        expenses.forEach(expense => {
+          if (expense.currency === 'USD') {
+            usdRefund += expense.amount
+          } else {
+            lbpRefund += expense.amount
+          }
+        })
+        
+        set({
+          expenses: [],
+          currentDrawerAmountUsd: currentDrawerAmountUsd + usdRefund,
+          currentDrawerAmountLbp: currentDrawerAmountLbp + lbpRefund
+        })
+      },
+
       getTodaysExpenses: () => {
         const { expenses } = get()
         const today = new Date().toDateString()
         return expenses.filter(expense => 
           new Date(expense.timestamp).toDateString() === today
         )
+      },
+
+      getAllExpenses: () => {
+        return get().expenses
+      },
+
+      getExpensesByDateRange: (startDate, endDate) => {
+        const { expenses } = get()
+        return expenses.filter(expense => {
+          const expenseDate = new Date(expense.timestamp)
+          return expenseDate >= startDate && expenseDate <= endDate
+        })
       },
 
       getTotalExpensesToday: () => {

@@ -66,6 +66,7 @@ import { useSettingsStore } from "@/stores/settings"
 import { VariantSelectionModal } from "@/components/pos/variant-selection-modal"
 import { groupProductsByVariants, getVariantDisplay } from "@/lib/product-variants"
 import { Product as ProductType, ProductVariant } from "@/types"
+import { ExpenseManagementDialog } from "@/components/cash/expense-management-dialog"
 
 interface Product {
   id: string
@@ -290,6 +291,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   const [showVariantModal, setShowVariantModal] = useState(false)
   const [selectedProductForVariant, setSelectedProductForVariant] = useState<ProductType | null>(null)
+  const [showExpenseManagement, setShowExpenseManagement] = useState(false)
 
   const handleProductClick = (item: DisplayItem) => {
     // Check if the item has variants
@@ -2642,14 +2644,25 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-gray-800">Expenses</h3>
-                  <Button 
-                    onClick={() => setShowAddExpense(true)}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Expense
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => setShowAddExpense(true)}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                    <Button 
+                      onClick={() => setShowExpenseManagement(true)}
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                    >
+                      <Archive className="h-4 w-4 mr-1" />
+                      Manage
+                    </Button>
+                  </div>
                 </div>
                 
                 {/* Today's Expenses Summary */}
@@ -4230,6 +4243,12 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         }}
         onVariantSelect={handleVariantSelect}
         isDarkMode={false}
+      />
+      
+      {/* Expense Management Dialog */}
+      <ExpenseManagementDialog
+        isOpen={showExpenseManagement}
+        onClose={() => setShowExpenseManagement(false)}
       />
     </div>
   )
