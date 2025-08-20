@@ -212,6 +212,10 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [showMixedPayment, setShowMixedPayment] = useState(false)
   const [discountTarget, setDiscountTarget] = useState<{ itemId?: string, itemName?: string, price?: number } | null>(null)
   const [showItemDiscountDialog, setShowItemDiscountDialog] = useState(false)
+  const [showCurrencySettings, setShowCurrencySettings] = useState(false)
+  
+  // Settings store
+  const { settings, updateCurrencySettings } = useSettingsStore()
 
   // Ensure training mode is disabled on component mount and auto-select default customer
   useEffect(() => {
@@ -1469,6 +1473,16 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
 
           {/* Right - User Info */}
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCurrencySettings(true)}
+              className="hover:bg-purple-50 border-purple-200"
+              title="Currency Settings"
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Rate: {(settings.currency.exchangeRate || 89500).toLocaleString()} LBP
+            </Button>
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/50 backdrop-blur-sm border border-purple-200/40">
               <User className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-semibold text-purple-900">{user}</span>
@@ -2090,7 +2104,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                 </div>
 
                 {/* Referral Code Input */}
-                <div className="pt-4">
+                <div className="pt-4 mb-6">
                   <label className="text-sm font-medium text-gray-700 mb-2 block">Referral Code</label>
                   <div className="flex gap-2">
                     <Input
@@ -3763,6 +3777,127 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
           onComplete={handleMixedPayment}
           onCancel={() => setShowMixedPayment(false)}
         />
+      )}
+
+      {/* Currency Settings Dialog */}
+      {showCurrencySettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 bg-white">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Currency Settings
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCurrencySettings(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">
+                    Exchange Rate (1 USD = ? LBP)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={settings.currency.exchangeRate}
+                    onChange={(e) => {
+                      const newRate = parseFloat(e.target.value) || 89500
+                      updateCurrencySettings({ exchangeRate: newRate })
+                      playSuccess()
+                    }}
+                    className="mt-1 text-lg font-semibold"
+                    placeholder="89500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Current rate: 1 USD = {settings.currency.exchangeRate.toLocaleString()} LBP
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">
+                    Accept Mixed Payments
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Button
+                      variant={settings.currency.acceptMixedPayment ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        updateCurrencySettings({ acceptMixedPayment: true })
+                        playSuccess()
+                      }}
+                    >
+                      Enabled
+                    </Button>
+                    <Button
+                      variant={!settings.currency.acceptMixedPayment ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        updateCurrencySettings({ acceptMixedPayment: false })
+                        playSuccess()
+                      }}
+                    >
+                      Disabled
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">
+                    Round LBP to nearest
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    {[500, 1000, 5000, 10000].map((value) => (
+                      <Button
+                        key={value}
+                        variant={settings.currency.roundLbpTo === value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          updateCurrencySettings({ roundLbpTo: value })
+                          playSuccess()
+                        }}
+                      >
+                        {value.toLocaleString()}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      <strong>Example:</strong> $10 = {(10 * settings.currency.exchangeRate).toLocaleString()} LBP
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      updateCurrencySettings({ exchangeRate: 89500, roundLbpTo: 1000 })
+                      playSuccess()
+                    }}
+                    className="flex-1"
+                  >
+                    Reset to Default
+                  </Button>
+                  <Button
+                    onClick={() => setShowCurrencySettings(false)}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
       )}
       
       {/* Discount Dialog for Cart */}
