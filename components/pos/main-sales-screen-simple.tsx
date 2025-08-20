@@ -59,6 +59,7 @@ import { CashCountDialog } from "@/components/cash/cash-count-dialog"
 import { MixedCurrencyPayment, PaymentDetails } from "@/components/pos/mixed-currency-payment"
 import { DiscountDialog, DiscountDetails } from "@/components/pos/discount-dialog"
 import { CustomerSelector } from "@/components/pos/customer-selector"
+import { useSettingsStore } from "@/stores/settings"
 
 interface Product {
   id: string
