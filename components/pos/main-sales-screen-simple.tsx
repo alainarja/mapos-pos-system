@@ -2390,7 +2390,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                   variant="outline"
                   onClick={() => {
                     printCashDrawerReport(
-                      safeCurrentDrawerAmount,
+                      safeCurrentDrawerAmountUsd,
                       getTodaysExpenses(),
                       cashCounts.filter(count => 
                         new Date(count.timestamp).toDateString() === new Date().toDateString()
@@ -3812,7 +3812,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
       <CashCountDialog
         isOpen={showCashCount}
         onClose={() => setShowCashCount(false)}
-        expectedAmount={safeCurrentDrawerAmount}
+        expectedAmount={safeCurrentDrawerAmountUsd}
         cashier={user || "Unknown"}
       />
       
