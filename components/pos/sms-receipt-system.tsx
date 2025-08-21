@@ -108,7 +108,7 @@ const generateSMSContent = (
   ).join('\n')
 
   // Generate receipt link (in real implementation, this would be a real URL)
-  const receiptLink = `https://receipts.mapos.com/r/${receipt.id}`
+  const receiptLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/receipt/${receipt.receiptNumber || receipt.id}`
 
   let content = template.template
     .replace(/{STORE_NAME}/g, storeName)
@@ -259,7 +259,7 @@ export function SMSReceiptSystem({
 
   const generateReceiptQR = () => {
     // In a real implementation, this would generate an actual QR code
-    const receiptUrl = `https://receipts.mapos.com/r/${receipt.id}`
+    const receiptUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/receipt/${receipt.receiptNumber || receipt.id}`
     return receiptUrl
   }
 
@@ -643,7 +643,7 @@ export function SMSReceiptSystem({
                       </p>
                       <Button
                         onClick={() => {
-                          const webUrl = `https://receipts.mapos.com/r/${receipt.id}`
+                          const webUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/receipt/${receipt.receiptNumber || receipt.id}`
                           navigator.clipboard.writeText(webUrl)
                           toast({
                             title: "Link Copied",

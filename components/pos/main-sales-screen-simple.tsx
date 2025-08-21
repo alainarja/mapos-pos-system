@@ -1076,6 +1076,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         // Create local transaction record for UI
         const transaction = {
           id: result.saleId || Date.now().toString(),
+          receiptNumber: result.receiptNumber || `RCP-${Date.now().toString().slice(-8)}`,
           timestamp: new Date(),
           items: cart,
           subtotal,
@@ -1093,6 +1094,33 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         
         // Print receipt
         printReceipt(transaction)
+        
+        // Auto-send WhatsApp receipt if customer has WhatsApp number
+        if (selectedCustomer?.whatsapp) {
+          try {
+            const receiptId = transaction.receiptNumber || result.saleId || transaction.id
+            await shareReceiptViaWhatsApp(receiptId, selectedCustomer.whatsapp)
+            
+            addNotification({
+              id: Date.now().toString(),
+              type: 'info',
+              title: 'Receipt Sent',
+              message: `Digital receipt sent to ${selectedCustomer.name} via WhatsApp`,
+              timestamp: new Date(),
+              isRead: false
+            })
+          } catch (error) {
+            console.error('Failed to send WhatsApp receipt:', error)
+            addNotification({
+              id: Date.now().toString(),
+              type: 'warning',
+              title: 'WhatsApp Send Failed',
+              message: `Could not send receipt to ${selectedCustomer.name} via WhatsApp`,
+              timestamp: new Date(),
+              isRead: false
+            })
+          }
+        }
         
         // Refresh inventory to show updated stock levels
         await refreshInventory()

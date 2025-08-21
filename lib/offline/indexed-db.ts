@@ -169,6 +169,44 @@ class IndexedDBManager {
     })
   }
 
+  async getAllTransactions(): Promise<OfflineTransaction[]> {
+    const db = await this.ensureDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['transactions'], 'readonly')
+      const store = tx.objectStore('transactions')
+      
+      const request = store.getAll()
+
+      request.onsuccess = () => {
+        resolve(request.result || [])
+      }
+
+      request.onerror = () => {
+        console.error('Failed to get all transactions:', request.error)
+        reject(request.error)
+      }
+    })
+  }
+
+  async getTransactionById(id: string): Promise<OfflineTransaction | null> {
+    const db = await this.ensureDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['transactions'], 'readonly')
+      const store = tx.objectStore('transactions')
+      
+      const request = store.get(id)
+
+      request.onsuccess = () => {
+        resolve(request.result || null)
+      }
+
+      request.onerror = () => {
+        console.error('Failed to get transaction by id:', request.error)
+        reject(request.error)
+      }
+    })
+  }
+
   // Queue Management
   async addToQueue(request: QueuedRequest): Promise<void> {
     const db = await this.ensureDB()
