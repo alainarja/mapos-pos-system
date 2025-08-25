@@ -45,6 +45,7 @@ import {
   Star,
   Utensils,
   TableProperties,
+  CalendarDays,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -72,7 +73,7 @@ import { ExpenseManagementDialog } from "@/components/cash/expense-management-di
 import { useTablesStore } from "@/stores/tables"
 
 // Lazy load table components
-const TableSelectionSimple = lazy(() => import("@/components/restaurant/table-selection-simple"))
+const TableSelectionResponsive = lazy(() => import("@/components/restaurant/table-selection-responsive"))
 const TableConfigurationSimple = lazy(() => import("@/components/restaurant/table-configuration-simple"))
 
 interface Product {
@@ -1619,6 +1620,23 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
                 >
                   <TableProperties className="h-5 w-5" />
                   <span>Configure Tables</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-12 px-4 hover:bg-yellow-50 hover:text-yellow-700"
+                  onClick={() => {
+                    setShowTableSelection(true)
+                    setIsSidebarOpen(false)
+                  }}
+                >
+                  <CalendarDays className="h-5 w-5" />
+                  <span>Reservations</span>
+                  {useTablesStore.getState().getUpcomingReservations().length > 0 && (
+                    <Badge className="ml-auto" variant="secondary">
+                      {useTablesStore.getState().getUpcomingReservations().length}
+                    </Badge>
+                  )}
                 </Button>
               </>
             )}
@@ -4337,7 +4355,7 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
               <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
             </div>
           }>
-            <TableSelectionSimple 
+            <TableSelectionResponsive 
               onClose={() => setShowTableSelection(false)}
               onTableSelect={(tableId) => {
                 console.log('Table selected:', tableId)

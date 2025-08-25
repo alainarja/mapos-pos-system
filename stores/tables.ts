@@ -7,6 +7,21 @@ export interface TablePosition {
   y: number
 }
 
+export interface Reservation {
+  id: string
+  tableId: string
+  customerName: string
+  customerPhone: string
+  customerEmail?: string
+  date: Date
+  time: string
+  duration: number // in minutes
+  partySize: number
+  notes?: string
+  status: 'confirmed' | 'pending' | 'cancelled' | 'completed'
+  createdAt: Date
+}
+
 export interface Table {
   id: string
   number: number
@@ -16,6 +31,7 @@ export interface Table {
   status: 'available' | 'occupied' | 'reserved' | 'cleaning'
   rotation?: number
   size?: 'small' | 'medium' | 'large'
+  reservation?: Reservation
 }
 
 export interface TableCart {
@@ -47,6 +63,7 @@ interface TablesState {
   floorPlan: RestaurantFloorPlan
   tableCarts: Map<string, TableCart>
   activeTableId: string | null
+  reservations: Reservation[]
   
   // Restaurant mode
   setRestaurantMode: (enabled: boolean) => void
@@ -75,6 +92,14 @@ interface TablesState {
   getTableOccupancyRate: () => number
   getAverageTableTime: () => number
   getTotalRevenue: () => number
+  
+  // Reservations
+  addReservation: (reservation: Omit<Reservation, 'id' | 'createdAt'>) => void
+  updateReservation: (id: string, updates: Partial<Reservation>) => void
+  cancelReservation: (id: string) => void
+  getReservationsByDate: (date: Date) => Reservation[]
+  getUpcomingReservations: () => Reservation[]
+  checkTableAvailability: (tableId: string, date: Date, time: string, duration: number) => boolean
 }
 
 const defaultFloorPlan: RestaurantFloorPlan = {
@@ -142,6 +167,7 @@ export const useTablesStore = create<TablesState>()(
       floorPlan: defaultFloorPlan,
       tableCarts: new Map(),
       activeTableId: null,
+      reservations: [],
       
       setRestaurantMode: (enabled: boolean) => {
         set({ isRestaurantMode: enabled })
@@ -383,13 +409,113 @@ export const useTablesStore = create<TablesState>()(
         })
         
         return total
+      },
+      
+      // Reservation Management
+      addReservation: (reservation: Omit<Reservation, 'id' | 'createdAt'>) => {
+        const newReservation: Reservation = {
+          ...reservation,
+          id: `res-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          createdAt: new Date()
+        }
+        
+        set((state) => ({
+          reservations: [...state.reservations, newReservation]
+        }))
+        
+        // Update table status if reservation is for today
+        const today = new Date()
+        const resDate = new Date(reservation.date)
+        if (resDate.toDateString() === today.toDateString()) {
+          const { floorPlan } = get()
+          const table = floorPlan.tables.find(t => t.id === reservation.tableId)
+          if (table) {
+            get().updateTable(reservation.tableId, {
+              status: 'reserved',
+              reservation: newReservation
+            })
+          }
+        }
+      },
+      
+      updateReservation: (id: string, updates: Partial<Reservation>) => {
+        set((state) => ({
+          reservations: state.reservations.map(res =>
+            res.id === id ? { ...res, ...updates } : res
+          )
+        }))
+      },
+      
+      cancelReservation: (id: string) => {
+        const { reservations, floorPlan } = get()
+        const reservation = reservations.find(r => r.id === id)
+        
+        if (reservation) {
+          // Update reservation status
+          get().updateReservation(id, { status: 'cancelled' })
+          
+          // Update table status if needed
+          const table = floorPlan.tables.find(t => t.id === reservation.tableId)
+          if (table && table.reservation?.id === id) {
+            get().updateTable(reservation.tableId, {
+              status: 'available',
+              reservation: undefined
+            })
+          }
+        }
+      },
+      
+      getReservationsByDate: (date: Date) => {
+        const { reservations } = get()
+        return reservations.filter(res => {
+          const resDate = new Date(res.date)
+          return resDate.toDateString() === date.toDateString() &&
+                 res.status !== 'cancelled'
+        })
+      },
+      
+      getUpcomingReservations: () => {
+        const { reservations } = get()
+        const now = new Date()
+        return reservations.filter(res => {
+          const resDate = new Date(res.date)
+          return resDate >= now && res.status !== 'cancelled'
+        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      },
+      
+      checkTableAvailability: (tableId: string, date: Date, time: string, duration: number) => {
+        const { reservations } = get()
+        const tableReservations = reservations.filter(
+          res => res.tableId === tableId && 
+                 new Date(res.date).toDateString() === date.toDateString() &&
+                 res.status !== 'cancelled'
+        )
+        
+        // Convert time string to minutes
+        const [hours, minutes] = time.split(':').map(Number)
+        const requestedStart = hours * 60 + minutes
+        const requestedEnd = requestedStart + duration
+        
+        for (const res of tableReservations) {
+          const [resHours, resMinutes] = res.time.split(':').map(Number)
+          const resStart = resHours * 60 + resMinutes
+          const resEnd = resStart + res.duration
+          
+          // Check for overlap
+          if (requestedStart < resEnd && requestedEnd > resStart) {
+            return false
+          }
+        }
+        
+        return true
       }
     }),
     {
       name: 'tables-storage',
       partialize: (state) => ({
         floorPlan: state.floorPlan,
-        isRestaurantMode: state.isRestaurantMode
+        isRestaurantMode: state.isRestaurantMode,
+        reservations: state.reservations
       }),
       storage: {
         getItem: (name) => {
