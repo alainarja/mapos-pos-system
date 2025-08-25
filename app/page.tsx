@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { LoginScreen } from "@/components/auth/login-screen"
 import { PinLock, type PinLockRef } from "@/components/auth/pin-lock"
 import { MainSalesScreen } from "@/components/pos/main-sales-screen-simple"
@@ -11,6 +12,14 @@ type AuthMode = "login" | "pin" | "authenticated"
 // Force rebuild to update environment variables - $(date)
 
 export default function HomePage() {
+  const router = useRouter()
+  
+  // Check if restaurant mode is enabled and redirect if needed
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_RESTAURANT_MODE === 'true') {
+      router.push('/restaurant')
+    }
+  }, [])
   const [authMode, setAuthMode] = useState<AuthMode>("login")
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(false)
