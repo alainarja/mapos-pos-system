@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { SoundButton } from "@/components/ui/sound-button"
 import { useSound } from "@/hooks/use-sound"
@@ -43,6 +43,8 @@ import {
   ArrowRightLeft,
   Store,
   Star,
+  Utensils,
+  TableProperties,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -67,6 +69,11 @@ import { VariantSelectionModal } from "@/components/pos/variant-selection-modal"
 import { groupProductsByVariants, getVariantDisplay } from "@/lib/product-variants"
 import { Product as ProductType, ProductVariant } from "@/types"
 import { ExpenseManagementDialog } from "@/components/cash/expense-management-dialog"
+import { useTablesStore } from "@/stores/tables"
+
+// Lazy load table components
+const TableSelectionSimple = lazy(() => import("@/components/restaurant/table-selection-simple"))
+const TableConfigurationSimple = lazy(() => import("@/components/restaurant/table-configuration-simple"))
 
 interface Product {
   id: string
@@ -292,6 +299,16 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
   const [showVariantModal, setShowVariantModal] = useState(false)
   const [selectedProductForVariant, setSelectedProductForVariant] = useState<ProductType | null>(null)
   const [showExpenseManagement, setShowExpenseManagement] = useState(false)
+  
+  // Table management states
+  const [showTableSelection, setShowTableSelection] = useState(false)
+  const [showTableConfiguration, setShowTableConfiguration] = useState(false)
+  const { activeTableId, getTableCart } = useTablesStore()
+  const isRestaurantMode = process.env.NEXT_PUBLIC_RESTAURANT_MODE === 'true'
+  
+  // Get active table info
+  const activeTable = activeTableId ? useTablesStore.getState().floorPlan.tables.find(t => t.id === activeTableId) : null
+  const activeTableCart = activeTableId ? getTableCart(activeTableId) : null
 
   const handleProductClick = (item: DisplayItem) => {
     // Check if the item has variants
@@ -1572,6 +1589,39 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
               <span>Returns & Exchanges</span>
             </Button>
             
+            {/* Restaurant Mode Buttons */}
+            {isRestaurantMode && (
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-12 px-4 hover:bg-green-50 hover:text-green-700"
+                  onClick={() => {
+                    setShowTableSelection(true)
+                    setIsSidebarOpen(false)
+                  }}
+                >
+                  <Utensils className="h-5 w-5" />
+                  <span>Tables</span>
+                  {activeTable && (
+                    <Badge className="ml-auto" variant="secondary">
+                      T{activeTable.number}
+                    </Badge>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-12 px-4 hover:bg-blue-50 hover:text-blue-700"
+                  onClick={() => {
+                    setShowTableConfiguration(true)
+                    setIsSidebarOpen(false)
+                  }}
+                >
+                  <TableProperties className="h-5 w-5" />
+                  <span>Configure Tables</span>
+                </Button>
+              </>
+            )}
             
             <Button
               variant="ghost"
@@ -4278,6 +4328,52 @@ export function MainSalesScreen({ user, userWarehouseId, userWarehouseName, onLo
         isOpen={showExpenseManagement}
         onClose={() => setShowExpenseManagement(false)}
       />
+      
+      {/* Table Selection Dialog */}
+      {isRestaurantMode && showTableSelection && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Suspense fallback={
+            <div className="bg-white rounded-lg p-8">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          }>
+            <TableSelectionSimple 
+              onClose={() => setShowTableSelection(false)}
+              onTableSelect={(tableId) => {
+                console.log('Table selected:', tableId)
+                setShowTableSelection(false)
+              }}
+            />
+          </Suspense>
+        </div>
+      )}
+      
+      {/* Table Configuration Dialog */}
+      {isRestaurantMode && showTableConfiguration && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-xl font-bold">Configure Restaurant Tables</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTableConfiguration(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="p-4 overflow-auto max-h-[calc(90vh-80px)]">
+              <Suspense fallback={
+                <div className="flex justify-center p-8">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                </div>
+              }>
+                <TableConfigurationSimple />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
